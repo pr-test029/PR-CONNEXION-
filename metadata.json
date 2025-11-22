@@ -1,0 +1,8 @@
+{
+  "name": "PR-CONNEXION",
+  "description": "Réseau social professionnel pour les femmes entrepreneures du Cluster Congo Entreprise Développement. Plateforme d'échange, de suivi de parcours et de localisation.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ]
+}

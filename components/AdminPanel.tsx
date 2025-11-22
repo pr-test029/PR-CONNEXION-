@@ -1,0 +1,344 @@
+
+import React, { useState, useEffect } from 'react';
+import { storageService } from '../services/storageService';
+import { StrategicGoal, Notification, ClusterVictory, Member } from '../types';
+import { Bell, Send, CheckCircle, Plus, Trash2, Target, ShieldAlert, Trophy, Edit2, Save, X, Lock } from 'lucide-react';
+
+export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}) => {
+
+  // Notification State
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  
+  // Goals State
+  const [goals, setGoals] = useState<StrategicGoal[]>([]);
+  const [newGoalText, setNewGoalText] = useState('');
+  
+  // Victories State
+  const [victories, setVictories] = useState<ClusterVictory[]>([]);
+  const [newVictoryTitle, setNewVictoryTitle] = useState('');
+  const [newVictoryDesc, setNewVictoryDesc] = useState('');
+  const [editingVictoryId, setEditingVictoryId] = useState<string | null>(null);
+
+  const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (currentUser?.role === 'ADMIN') {
+        setGoals(storageService.getStrategicGoals());
+        setVictories(storageService.getVictories());
+    }
+  }, [currentUser]);
+
+  // --- ACCESS CONTROL ---
+  if (!currentUser || currentUser.role !== 'ADMIN') {
+      return (
+          <div className="flex flex-col items-center justify-center h-[60vh] text-center p-6">
+              <div className="bg-red-50 p-6 rounded-full mb-4">
+                  <Lock className="w-12 h-12 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Accès Refusé</h2>
+              <p className="text-gray-500 max-w-md">
+                  Cette section est réservée aux administrateurs du Cluster. Veuillez vous connecter avec un compte autorisé.
+              </p>
+          </div>
+      );
+  }
+
+  // --- NOTIFICATIONS HANDLERS ---
+  const handleSendNotification = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !message) return;
+
+    const newNotif: Notification = {
+      id: Date.now().toString(),
+      title,
+      message,
+      date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+      authorName: currentUser?.name || 'Administration'
+    };
+
+    storageService.addNotification(newNotif);
+    setTitle('');
+    setMessage('');
+    setSuccessMsg('Notification envoyée à tous les membres avec succès !');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  // --- GOALS HANDLERS ---
+  const handleAddGoal = () => {
+    if (!newGoalText.trim()) return;
+    const updatedGoals = storageService.addStrategicGoal(newGoalText);
+    setGoals(updatedGoals);
+    setNewGoalText('');
+  };
+
+  const handleToggleGoal = (id: string) => {
+    const updatedGoals = storageService.toggleStrategicGoal(id);
+    setGoals(updatedGoals);
+  };
+
+  const handleDeleteGoal = (id: string) => {
+    const updatedGoals = storageService.deleteStrategicGoal(id);
+    setGoals(updatedGoals);
+  };
+
+  // --- VICTORIES HANDLERS ---
+  const handleSaveVictory = () => {
+    if (!newVictoryTitle.trim() || !newVictoryDesc.trim()) return;
+
+    if (editingVictoryId) {
+        // Update
+        const updatedList = storageService.updateVictory(editingVictoryId, {
+            title: newVictoryTitle,
+            description: newVictoryDesc
+        });
+        setVictories(updatedList);
+        setEditingVictoryId(null);
+        setSuccessMsg('Victoire modifiée avec succès !');
+    } else {
+        // Create
+        const newVictory: ClusterVictory = {
+            id: Date.now().toString(),
+            title: newVictoryTitle,
+            description: newVictoryDesc,
+            date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+        };
+        const updatedList = storageService.addVictory(newVictory);
+        setVictories(updatedList);
+        setSuccessMsg('Victoire ajoutée avec succès !');
+    }
+    
+    setNewVictoryTitle('');
+    setNewVictoryDesc('');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleEditVictory = (victory: ClusterVictory) => {
+      setEditingVictoryId(victory.id);
+      setNewVictoryTitle(victory.title);
+      setNewVictoryDesc(victory.description);
+  };
+
+  const handleCancelEditVictory = () => {
+      setEditingVictoryId(null);
+      setNewVictoryTitle('');
+      setNewVictoryDesc('');
+  };
+
+  const handleDeleteVictory = (id: string) => {
+      if (window.confirm('Êtes-vous sûr de vouloir supprimer cette victoire ?')) {
+          const updatedList = storageService.deleteVictory(id);
+          setVictories(updatedList);
+      }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 pb-20">
+      
+      {/* Header */}
+      <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-6 rounded-xl shadow-lg text-white flex items-center justify-between">
+        <div>
+           <h2 className="text-2xl font-bold flex items-center">
+             <ShieldAlert className="w-6 h-6 mr-3 text-red-500" />
+             Administration du Cluster
+           </h2>
+           <p className="text-gray-400 text-sm mt-1">Espace réservé au comité de pilotage et administrateurs.</p>
+        </div>
+      </div>
+
+      {successMsg && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative animate-in fade-in slide-in-from-top-2">
+          <strong className="font-bold">Succès! </strong>
+          <span className="block sm:inline">{successMsg}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        {/* Send Notification Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <Bell className="w-5 h-5 mr-2 text-primary-600" />
+            Envoyer une Annonce Globale
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Ce message déclenchera une notification pour tous les membres via l'icône cloche.
+          </p>
+          
+          <form onSubmit={handleSendNotification} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sujet de l'annonce</label>
+              <input 
+                type="text" 
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Ex: Réunion mensuelle..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message détaillé</label>
+              <textarea 
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary-500 h-32 resize-none"
+                placeholder="Votre message ici..."
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={!title || !message}
+              className="w-full bg-primary-600 text-white py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center justify-center disabled:opacity-50"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Envoyer à tous
+            </button>
+          </form>
+        </div>
+
+        {/* Strategic Goals Management */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <Target className="w-5 h-5 mr-2 text-blue-600" />
+            Cap Stratégique 2026
+          </h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Gérez les objectifs du cluster. Cochez pour mettre à jour la progression sur le tableau de bord.
+          </p>
+
+          <div className="space-y-3 mb-6 max-h-[300px] overflow-y-auto pr-2">
+            {goals.map(goal => (
+              <div key={goal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors">
+                 <div className="flex items-center space-x-3 flex-1">
+                    <button 
+                      onClick={() => handleToggleGoal(goal.id)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                        goal.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-300'
+                      }`}
+                    >
+                      {goal.isCompleted && <CheckCircle className="w-3 h-3" />}
+                    </button>
+                    <span className={`text-sm ${goal.isCompleted ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                      {goal.text}
+                    </span>
+                 </div>
+                 <button 
+                    onClick={() => handleDeleteGoal(goal.id)}
+                    className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                 >
+                   <Trash2 className="w-4 h-4" />
+                 </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex space-x-2">
+            <input 
+              type="text" 
+              value={newGoalText}
+              onChange={(e) => setNewGoalText(e.target.value)}
+              className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Nouvel objectif..."
+            />
+            <button 
+              onClick={handleAddGoal}
+              disabled={!newGoalText.trim()}
+              className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* CLUSTER VICTORIES MANAGEMENT */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:col-span-2">
+           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
+            Gestion des Victoires du Cluster
+          </h3>
+          <p className="text-xs text-gray-500 mb-6">
+            Ajoutez ici les succès majeurs qui seront affichés dans la section "Annonces" pour motiver la communauté.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Form */}
+              <div className="space-y-4">
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                      <h4 className="font-bold text-sm text-yellow-800 mb-3">
+                          {editingVictoryId ? 'Modifier la victoire' : 'Ajouter une nouvelle victoire'}
+                      </h4>
+                      <div className="space-y-3">
+                          <input 
+                            type="text" 
+                            value={newVictoryTitle}
+                            onChange={(e) => setNewVictoryTitle(e.target.value)}
+                            className="w-full bg-white border border-yellow-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400"
+                            placeholder="Titre (ex: Financement obtenu)"
+                          />
+                          <textarea 
+                            value={newVictoryDesc}
+                            onChange={(e) => setNewVictoryDesc(e.target.value)}
+                            className="w-full bg-white border border-yellow-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400 h-20 resize-none"
+                            placeholder="Détails de la réussite..."
+                          />
+                          <div className="flex space-x-2">
+                              <button 
+                                onClick={handleSaveVictory}
+                                disabled={!newVictoryTitle.trim() || !newVictoryDesc.trim()}
+                                className="flex-1 bg-yellow-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-yellow-600 transition-colors disabled:opacity-50 flex items-center justify-center"
+                              >
+                                <Save className="w-4 h-4 mr-2" />
+                                {editingVictoryId ? 'Mettre à jour' : 'Enregistrer'}
+                              </button>
+                              {editingVictoryId && (
+                                  <button 
+                                    onClick={handleCancelEditVictory}
+                                    className="px-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                                  >
+                                      <X className="w-4 h-4 text-gray-500" />
+                                  </button>
+                              )}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              {/* List */}
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                  {victories.length === 0 ? (
+                      <p className="text-sm text-gray-400 italic text-center py-10">Aucune victoire enregistrée.</p>
+                  ) : (
+                      victories.map(v => (
+                          <div key={v.id} className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow relative group">
+                              <div className="flex justify-between items-start">
+                                  <div>
+                                      <h5 className="font-bold text-gray-800 text-sm">{v.title}</h5>
+                                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{v.description}</p>
+                                      <span className="text-[10px] text-gray-400 mt-2 block">{v.date}</span>
+                                  </div>
+                                  <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => handleEditVictory(v)}
+                                        className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                                      >
+                                          <Edit2 className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteVictory(v.id)}
+                                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                      >
+                                          <Trash2 className="w-4 h-4" />
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      ))
+                  )}
+              </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
