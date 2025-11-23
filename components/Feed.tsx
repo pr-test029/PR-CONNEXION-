@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, X, UserCircle, Loader2 } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, X, UserCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Post, Comment, Member } from '../types';
 import { storageService } from '../services/storageService';
 
@@ -12,6 +12,7 @@ interface FeedProps {
 export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState<Post['type']>('Partage');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -21,11 +22,35 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const [commentsData, setCommentsData] = useState<{[postId: string]: Comment[]}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Persistent Visitor ID for likes (UUID format for compatibility)
+  const [visitorId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      let vid = localStorage.getItem('pr_visitor_id');
+      if (!vid) {
+        // Generate a UUID-like string to satisfy Postgres uuid types if needed
+        vid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+        localStorage.setItem('pr_visitor_id', vid);
+      }
+      return vid;
+    }
+    return 'unknown_visitor';
+  });
+
   const fetchPosts = async () => {
     setLoading(true);
-    const data = await storageService.getPosts();
-    setPosts(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await storageService.getPosts();
+      setPosts(data);
+    } catch (err: any) {
+      console.error("Fetch posts error", err);
+      setError("Impossible de charger le fil d'actualité. Vérifiez votre connexion.");
+    } finally {
+      setLoading(false);
+    }
   };
   
   useEffect(() => {
@@ -53,27 +78,55 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
       comments: 0,
       timestamp: '',
       image: selectedImage || undefined,
-      likedBy: []
+      likedBy: [],
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar
     };
 
-    await storageService.addPost(newPost);
-    setNewPostContent('');
-    setSelectedImage(null);
-    fetchPosts(); // Refresh feed
+    try {
+        await storageService.addPost(newPost);
+        setNewPostContent('');
+        setSelectedImage(null);
+        fetchPosts(); // Refresh feed
+    } catch (error: any) {
+        alert(error.message || "Erreur lors de la publication.");
+    }
   };
 
   const handleLike = async (post: Post) => {
-    if (!currentUser) return;
+    // Allow everyone to like (User or Visitor)
+    const userId = currentUser?.id || visitorId;
     
-    const likedBy = post.likedBy || [];
-    const isLiked = likedBy.includes(currentUser.id);
-    let newLikedBy = isLiked ? likedBy.filter(id => id !== currentUser.id) : [...likedBy, currentUser.id];
+    // Check if liked locally
+    let isLiked = (post.likedBy || []).includes(userId);
     
-    const updatedPost = { ...post, likes: newLikedBy.length, likedBy: newLikedBy };
-    await storageService.updatePost(updatedPost);
+    // Calculate new state
+    const alreadyLiked = isLiked;
+    let newLikedBy = [...(post.likedBy || [])];
+    
+    if (alreadyLiked) {
+        newLikedBy = newLikedBy.filter(id => id !== userId);
+    } else {
+        newLikedBy.push(userId);
+    }
+    
+    // Adjust count - visual only for optimistic
+    const newCount = alreadyLiked ? Math.max(0, post.likes - 1) : post.likes + 1;
+    
+    const updatedPost = { ...post, likes: newCount, likedBy: newLikedBy };
     
     // Optimistic update
     setPosts(posts.map(p => p.id === post.id ? updatedPost : p));
+
+    // Persist to DB
+    try {
+      await storageService.updatePost(updatedPost);
+    } catch (error: any) {
+      // Revert optimistic update on failure
+      console.warn("Like DB update failed:", error.message);
+      // We don't revert UI immediately to avoid flickering, but the next fetch will fix it.
+      // Ideally, show a toast here.
+    }
   };
 
   const toggleComments = async (postId: string) => {
@@ -83,21 +136,50 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
     } else {
       newSet.add(postId);
       // Fetch comments
-      const comments = await storageService.getCommentsForPost(postId);
-      setCommentsData(prev => ({...prev, [postId]: comments}));
+      try {
+        const comments = await storageService.getCommentsForPost(postId);
+        setCommentsData(prev => ({...prev, [postId]: comments}));
+      } catch (e) {
+        console.error("Failed loading comments", e);
+      }
     }
     setVisibleComments(newSet);
   };
 
   const submitComment = async (postId: string) => {
+    if (!currentUser) return; // Prevent guests from commenting
+
     const text = commentInputs[postId]?.trim();
     if (!text) return;
 
-    await storageService.addComment(postId, text, currentUser?.id);
-    
-    const comments = await storageService.getCommentsForPost(postId);
-    setCommentsData(prev => ({...prev, [postId]: comments}));
+    // Clear input immediately for UX
     setCommentInputs(prev => ({ ...prev, [postId]: '' }));
+
+    try {
+      // Add comment
+      await storageService.addComment(postId, text, currentUser.id);
+      
+      // Re-fetch comments to show the new one immediately
+      const updatedComments = await storageService.getCommentsForPost(postId);
+      setCommentsData(prev => ({...prev, [postId]: updatedComments}));
+
+      // Update comment count on the post UI
+      setPosts(prevPosts => 
+        prevPosts.map(p => 
+          p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p
+        )
+      );
+
+      // Ensure comments section is open
+      if (!visibleComments.has(postId)) {
+        setVisibleComments(prev => new Set(prev).add(postId));
+      }
+
+    } catch (error: any) {
+      console.error("Error submitting comment:", error);
+      alert(`Erreur lors de l'envoi du commentaire: ${error.message || "Erreur inconnue"}`);
+      setCommentInputs(prev => ({ ...prev, [postId]: text })); // Restore text on failure
+    }
   };
 
   const handleShare = async (post: Post) => {
@@ -119,8 +201,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
     : posts.filter(post => post.type === filterMapping[activeFilter]);
 
   const filters = ['Tous', 'Besoins', 'Succès', 'Partages', 'Questions'];
-  const guestAvatar = "https://ui-avatars.com/api/?name=Visiteur&background=f3f4f6&color=6b7280";
-
+  
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
       {currentUser ? (
@@ -167,7 +248,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <UserCircle className="w-5 h-5 text-blue-500" />
-            <p className="text-sm text-blue-700 dark:text-blue-300">Vous êtes en mode visiteur.</p>
+            <p className="text-sm text-blue-700 dark:text-blue-300">Connectez-vous pour publier et commenter. L'interaction est réservée aux membres.</p>
           </div>
         </div>
       )}
@@ -182,26 +263,39 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
 
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+            <AlertCircle className="w-10 h-10 text-red-400 mb-3" />
+            <p className="text-gray-800 dark:text-white font-medium">{error}</p>
+            <button onClick={fetchPosts} className="mt-4 text-primary-600 hover:underline text-sm">Réessayer</button>
+        </div>
       ) : filteredPosts.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-dark-card rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
           <p className="text-gray-400">Aucune publication.</p>
         </div>
       ) : (
         filteredPosts.map((post) => {
-          const isLiked = currentUser && (post.likedBy || []).includes(currentUser.id);
+          // Check likes using currentUser or visitorId strictly from DB data in post
+          const userId = currentUser?.id || visitorId;
+          const isLiked = (post.likedBy || []).includes(userId);
+          
           const comments = commentsData[post.id] || [];
+          const commentCount = post.comments > comments.length ? post.comments : comments.length;
           
           return (
             <div key={post.id} className="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
               <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm cursor-pointer" onClick={() => onAuthorClick?.(post.authorId)}>
-                       ?
-                    </div>
+                    <img 
+                      src={post.authorAvatar || `https://ui-avatars.com/api/?name=User&background=random`} 
+                      alt={post.authorName} 
+                      className="w-10 h-10 rounded-full border border-gray-200 object-cover cursor-pointer" 
+                      onClick={() => onAuthorClick?.(post.authorId)}
+                    />
                     <div>
                       <div className="font-bold text-gray-900 dark:text-white cursor-pointer" onClick={() => onAuthorClick?.(post.authorId)}>
-                        Membre Cluster
+                        {post.authorName || 'Membre Cluster'}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{post.timestamp}</div>
                     </div>
@@ -220,7 +314,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
                       <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} /><span>{post.likes}</span>
                     </button>
                     <button onClick={() => toggleComments(post.id)} className="flex items-center space-x-2 text-gray-500 hover:text-primary-600 transition-colors text-sm">
-                      <MessageSquare className="w-5 h-5" /><span>{comments.length || post.comments}</span>
+                      <MessageSquare className="w-5 h-5" /><span>{commentCount}</span>
                     </button>
                   </div>
                   <button onClick={() => handleShare(post)} className="text-gray-400 hover:text-gray-600"><Share2 className="w-5 h-5" /></button>
@@ -229,31 +323,46 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
 
               {visibleComments.has(post.id) && (
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 border-t border-gray-100 dark:border-gray-700">
-                  <div className="space-y-3 mb-4">
-                    {comments.map(c => (
+                  <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-1">
+                    {comments.length > 0 ? comments.map(c => (
                       <div key={c.id} className="flex space-x-3">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-primary-700">{c.authorName.charAt(0)}</div>
+                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-primary-700">
+                            {c.authorName.charAt(0)}
+                        </div>
                         <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm flex-1">
                           <p className="text-xs font-bold text-gray-900 dark:text-white">{c.authorName}</p>
                           <p className="text-sm text-gray-700 dark:text-gray-300">{c.content}</p>
+                          <p className="text-[10px] text-gray-400 mt-1">{c.timestamp}</p>
                         </div>
                       </div>
-                    ))}
+                    )) : (
+                        <p className="text-xs text-gray-500 text-center py-2">Soyez le premier à commenter.</p>
+                    )}
                   </div>
-                  <div className="flex space-x-2">
-                    <img src={currentUser ? currentUser.avatar : guestAvatar} className="w-8 h-8 rounded-full object-cover" alt="Avatar"/>
-                    <div className="flex-1 relative">
-                      <input
-                        type="text"
-                        value={commentInputs[post.id] || ''}
-                        onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
-                        onKeyDown={(e) => e.key === 'Enter' && submitComment(post.id)}
-                        placeholder="Votre commentaire..."
-                        className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full pl-4 pr-10 py-2 text-sm focus:ring-1 focus:ring-primary-500 outline-none dark:text-white"
-                      />
-                      <button onClick={() => submitComment(post.id)} className="absolute right-2 top-1.5 text-primary-600"><Send className="w-4 h-4" /></button>
+                  
+                  {currentUser ? (
+                    <div className="flex space-x-2">
+                      <img src={currentUser.avatar} className="w-8 h-8 rounded-full object-cover" alt="Avatar"/>
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          value={commentInputs[post.id] || ''}
+                          onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
+                          onKeyDown={(e) => e.key === 'Enter' && submitComment(post.id)}
+                          placeholder="Votre commentaire..."
+                          className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full pl-4 pr-10 py-2 text-sm focus:ring-1 focus:ring-primary-500 outline-none dark:text-white"
+                        />
+                        <button onClick={() => submitComment(post.id)} className="absolute right-2 top-1.5 text-primary-600 hover:scale-110 transition-transform">
+                            <Send className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-center p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-sm text-gray-500 dark:text-gray-400 italic">
+                      Seuls les membres connectés peuvent commenter.
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>

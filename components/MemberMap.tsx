@@ -1,16 +1,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { storageService } from '../services/storageService'; // Using real storage
-import { MapPin, Search, Navigation } from 'lucide-react';
+import { storageService } from '../services/storageService';
+import { MapPin, Search, Navigation, Crosshair, Loader2 } from 'lucide-react';
 import { Member } from '../types';
 
 // Declaration for the global Leaflet object added via CDN
 declare const L: any;
 
-export const MemberMap: React.FC = () => {
+interface MemberMapProps {
+  currentUser: Member | null;
+}
+
+export const MemberMap: React.FC<MemberMapProps> = ({ currentUser }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [isLocating, setIsLocating] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
@@ -76,10 +81,11 @@ export const MemberMap: React.FC = () => {
     layerGroupRef.current.clearLayers();
     markersRef.current = {};
 
-    const createCustomIcon = (avatarUrl: string) => {
+    const createCustomIcon = (avatarUrl: string, isCurrentUser: boolean) => {
+       const borderColor = isCurrentUser ? '#3b82f6' : '#ef4444'; // Blue for me, Red for others
        return L.divIcon({
         className: 'custom-div-icon',
-        html: `<div style="background-image: url('${avatarUrl}'); width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 3px solid #ef4444; box-shadow: 0 4px 6px rgba(0,0,0,0.3); background-color: white;"></div>`,
+        html: `<div style="background-image: url('${avatarUrl}'); width: 40px; height: 40px; border-radius: 50%; background-size: cover; border: 3px solid ${borderColor}; box-shadow: 0 4px 6px rgba(0,0,0,0.3); background-color: white;"></div>`,
         iconSize: [40, 40],
         iconAnchor: [20, 20],
         popupAnchor: [0, -20]
@@ -88,18 +94,22 @@ export const MemberMap: React.FC = () => {
 
     // Add markers for filtered members
     filteredMembers.forEach((member) => {
+      const isCurrentUser = currentUser?.id === member.id;
       const marker = L.marker([member.location.lat, member.location.lng], {
-        icon: createCustomIcon(member.avatar)
+        icon: createCustomIcon(member.avatar, isCurrentUser),
+        zIndexOffset: isCurrentUser ? 1000 : 0 // Put current user on top
       })
       .addTo(layerGroupRef.current)
       .bindPopup(`
         <div class="font-sans p-1 min-w-[150px]">
-          <h3 class="font-bold text-sm text-red-600 mb-1">${member.businessName}</h3>
+          <h3 class="font-bold text-sm ${isCurrentUser ? 'text-blue-600' : 'text-red-600'} mb-1">
+            ${member.businessName} ${isCurrentUser ? '(Vous)' : ''}
+          </h3>
           <p class="text-xs text-gray-800 font-medium">${member.name}</p>
           <p class="text-xs text-gray-500 mt-1 flex items-center">
             <span class="mr-1">📍</span> ${member.location.city}
           </p>
-          <span class="inline-block mt-2 px-2 py-0.5 bg-red-50 text-red-600 text-[10px] rounded-full font-semibold border border-red-100">
+          <span class="inline-block mt-2 px-2 py-0.5 ${isCurrentUser ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'} text-[10px] rounded-full font-semibold border">
             ${member.sector}
           </span>
         </div>
@@ -112,7 +122,7 @@ export const MemberMap: React.FC = () => {
       });
     });
 
-  }, [filteredMembers]);
+  }, [filteredMembers, currentUser]);
 
   // Handle FlyTo when selecting a member
   useEffect(() => {
@@ -133,10 +143,110 @@ export const MemberMap: React.FC = () => {
     }
   }, [selectedMemberId, allMembers]);
 
+  const handleLocateMe = () => {
+    if (!currentUser) return;
+    setIsLocating(true);
+
+    if (!navigator.geolocation) {
+      alert("La géolocalisation n'est pas supportée par votre navigateur.");
+      setIsLocating(false);
+      return;
+    }
+
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 20000, // 20 seconds timeout for better GPS lock
+      maximumAge: 0
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // 1. Reverse Geocoding: Fetch readable address from coordinates
+          // Using OpenStreetMap Nominatim API (free) to get city and road
+          let detectedCity = currentUser.location.city;
+          let detectedAddress = currentUser.location.address;
+
+          try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+              headers: {
+                'User-Agent': 'PR-CONNEXION-Cluster-App/1.0'
+              }
+            });
+            const data = await response.json();
+            
+            if (data && data.address) {
+              // Extract City: Nominatim returns variable fields for "city" depending on location type
+              detectedCity = data.address.city || data.address.town || data.address.village || data.address.municipality || detectedCity;
+              
+              // Extract Address: Use road name or display name parts
+              const road = data.address.road || data.address.pedestrian;
+              if (road) {
+                detectedAddress = road;
+              } else if (data.display_name) {
+                detectedAddress = data.display_name.split(',')[0];
+              }
+            }
+          } catch (geoError) {
+            console.warn("Reverse geocoding failed, using coords only", geoError);
+          }
+
+          // 2. Update DB with new Coordinates AND new Address details
+          await storageService.updateUserLocation(
+            currentUser.id, 
+            { lat: latitude, lng: longitude },
+            { city: detectedCity, address: detectedAddress }
+          );
+          
+          // 3. Update Local State immediately for UX
+          setAllMembers(prev => prev.map(m => 
+            m.id === currentUser.id 
+              ? { 
+                  ...m, 
+                  location: { 
+                    lat: latitude, 
+                    lng: longitude,
+                    city: detectedCity,
+                    address: detectedAddress
+                  } 
+                }
+              : m
+          ));
+          
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([latitude, longitude], 18);
+            setSelectedMemberId(currentUser.id);
+          }
+        } catch (e) {
+          console.error("Error updating location", e);
+          alert("Erreur lors de l'enregistrement de votre position.");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error", error);
+        
+        let msg = "Impossible de récupérer votre position.";
+        if (error && typeof error === 'object') {
+           if (error.code === 1) msg = "Accès à la localisation refusé. Vérifiez vos permissions.";
+           else if (error.code === 2) msg = "Position indisponible. Vérifiez que votre GPS est activé.";
+           else if (error.code === 3) msg = "Délai d'attente dépassé.";
+        }
+        
+        alert(msg);
+        setIsLocating(false);
+      },
+      options
+    );
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-4">
-      {/* Sidebar List - Limited to 5 items visible logic */}
-      <div className="w-full lg:w-1/3 bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col overflow-hidden max-h-[400px] lg:max-h-full transition-colors">
+      {/* Sidebar List */}
+      <div className="w-full lg:w-1/3 bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col overflow-hidden max-h-[400px] lg:max-h-full transition-colors order-2 lg:order-1">
         <div className="p-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
             Membres ({filteredMembers.length})
@@ -155,9 +265,7 @@ export const MemberMap: React.FC = () => {
         
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {filteredMembers.length > 0 ? (
-            // LIMITATION: We slice to 5 to satisfy the request "limited to 5 members" in the list view
-            // unless user is filtering
-            filteredMembers.slice(0, 5).map(member => (
+            filteredMembers.slice(0, 50).map(member => (
               <div 
                 key={member.id}
                 onClick={() => setSelectedMemberId(member.id)}
@@ -167,7 +275,14 @@ export const MemberMap: React.FC = () => {
                     : 'hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent'
                 }`}
               >
-                <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600" />
+                <div className="relative">
+                   <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-600" />
+                   {currentUser?.id === member.id && (
+                     <span className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-0.5 border-2 border-white" title="C'est vous">
+                       <div className="w-2 h-2 bg-white rounded-full"></div>
+                     </span>
+                   )}
+                </div>
                 <div>
                   <h3 className={`text-sm font-semibold ${selectedMemberId === member.id ? 'text-primary-800 dark:text-primary-400' : 'text-gray-900 dark:text-white'}`}>
                     {member.businessName}
@@ -185,22 +300,30 @@ export const MemberMap: React.FC = () => {
               Aucun membre trouvé.
             </div>
           )}
-          
-          {/* Hint about hidden members if more than 5 and not searching */}
-          {filteredMembers.length > 5 && (
-            <div className="p-2 text-center">
-               <span className="text-xs text-gray-400 italic">
-                 + {filteredMembers.length - 5} autres membres sur la carte...
-               </span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Real Map Visualization Area */}
-      <div className="flex-1 bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group h-[400px] lg:h-auto">
+      <div className="flex-1 bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group h-[400px] lg:h-auto order-1 lg:order-2">
         {/* Map Container */}
         <div ref={mapContainerRef} className="absolute inset-0 z-0 bg-gray-100 dark:bg-gray-900" />
+        
+        {/* Locate Me Button */}
+        {currentUser && (
+          <button
+            onClick={handleLocateMe}
+            disabled={isLocating}
+            className="absolute top-4 right-4 z-[1000] bg-white dark:bg-dark-card p-3 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center space-x-2 font-medium text-sm group"
+            title="Mettre à jour ma position GPS exacte"
+          >
+             {isLocating ? (
+               <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+             ) : (
+               <Crosshair className="w-5 h-5 group-hover:text-primary-600" />
+             )}
+             <span className="hidden sm:inline">Ma Position</span>
+          </button>
+        )}
 
         {/* Details Overlay for Selected Member */}
         {selectedMember ? (

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Moon, Sun, Globe, Bell, Mail, Phone, MapPin, ChevronRight, Laptop, Info } from 'lucide-react';
 
@@ -145,8 +144,9 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
             <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg hover:bg-white/10 transition-colors">
               <Phone className="w-5 h-5 text-primary-400" />
               <div>
-                <p className="text-[10px] text-gray-400 uppercase font-bold">Téléphone</p>
+                <p className="text-[10px] text-gray-400 uppercase font-bold">Contact & WhatsApp</p>
                 <p className="text-sm font-medium">+242 06 769 61 57</p>
+                <p className="text-sm font-medium">+242 05 013 32 71</p>
               </div>
             </div>
 
@@ -154,7 +154,8 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
               <Mail className="w-5 h-5 text-primary-400" />
               <div className="overflow-hidden">
                 <p className="text-[10px] text-gray-400 uppercase font-bold">Email</p>
-                <p className="text-sm font-medium truncate" title="powerfulreach029@gmail.com">powerfulreach029@gmail.com</p>
+                <p className="text-xs font-medium truncate" title="powerfulreach029@gmail.com">powerfulreach029@gmail.com</p>
+                <p className="text-xs font-medium truncate" title="paulndamba2@gmail.com">paulndamba2@gmail.com</p>
               </div>
             </div>
 

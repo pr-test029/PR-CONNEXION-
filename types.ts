@@ -40,6 +40,8 @@ export interface Post {
   image?: string;
   likedBy: string[]; // Array of User IDs who liked this post
   commentsList?: Comment[];
+  authorName?: string;
+  authorAvatar?: string;
 }
 
 export interface DiscussionMessage {

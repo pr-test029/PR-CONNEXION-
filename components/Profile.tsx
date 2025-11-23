@@ -114,7 +114,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!user) return;
 
     const payload: any = {
@@ -131,17 +131,14 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
       payload.avatar = previewAvatar;
     }
 
-    const updatedUser = storageService.updateUser(user.id, payload);
-
-    if (updatedUser) {
-      // Note: In a real app we should await this, but updateUser in storageService returns Promise<Member | null>
-      // We need to handle the promise if we want to update local state immediately with the result
-      Promise.resolve(updatedUser).then(u => {
-        if (u) {
-          setUser(u);
+    try {
+        const updatedUser = await storageService.updateUser(user.id, payload);
+        if (updatedUser) {
+          setUser(updatedUser);
           setIsEditProfileModalOpen(false);
         }
-      });
+    } catch (error: any) {
+        alert(error.message || "Erreur lors de la sauvegarde du profil.");
     }
   };
 

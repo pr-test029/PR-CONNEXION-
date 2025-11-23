@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Feed } from './components/Feed';
@@ -97,7 +96,7 @@ const App: React.FC = () => {
       case AppView.DISCUSSION:
         return <GeneralDiscussion currentUser={currentUser} />;
       case AppView.MAP:
-        return <MemberMap />;
+        return <MemberMap currentUser={currentUser} />;
       case AppView.PROFILE:
         return (
           <Profile 
@@ -219,7 +218,7 @@ const App: React.FC = () => {
       {!isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-6 right-6 bg-gradient-to-r from-primary-600 to-primary-500 text-white p-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 z-40 group"
+          className="fixed bottom-28 right-6 bg-gradient-to-r from-primary-600 to-primary-500 text-white p-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 z-40 group"
         >
           <Sparkles className="w-6 h-6 group-hover:animate-pulse" />
         </button>

@@ -73,7 +73,7 @@ export const Training: React.FC<{currentUser: Member | null}> = ({currentUser}) 
     }
   };
 
-  const handleAddTraining = () => {
+  const handleAddTraining = async () => {
     if (!newTitle || (!selectedFile && !newLink) || !currentUser) return;
 
     let resourceUrl = '';
@@ -95,11 +95,14 @@ export const Training: React.FC<{currentUser: Member | null}> = ({currentUser}) 
       duration: selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(1)} MB` : 'Lien externe'
     };
 
-    // Add training and update local state
-    storageService.addTraining(newTraining).then(() => {
-       storageService.getTrainings().then(setTrainings);
-    });
-    closeUploadModal();
+    try {
+        await storageService.addTraining(newTraining);
+        const updated = await storageService.getTrainings();
+        setTrainings(updated);
+        closeUploadModal();
+    } catch (error: any) {
+        alert(error.message || "Erreur lors de l'ajout de la formation.");
+    }
   };
 
   const closeUploadModal = () => {
