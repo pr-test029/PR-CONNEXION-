@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
-import { StrategicGoal, Notification, ClusterVictory, Member } from '../types';
-import { Bell, Send, CheckCircle, Plus, Trash2, Target, ShieldAlert, Trophy, Edit2, Save, X, Lock } from 'lucide-react';
+import { StrategicGoal, Notification, ClusterVictory, Member, Post } from '../types';
+import { Bell, Send, CheckCircle, Plus, Trash2, Target, ShieldAlert, Trophy, Edit2, Save, X, Lock, AlertOctagon } from 'lucide-react';
 
 export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}) => {
 
@@ -20,12 +19,17 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
   const [newVictoryDesc, setNewVictoryDesc] = useState('');
   const [editingVictoryId, setEditingVictoryId] = useState<string | null>(null);
 
+  // Posts Moderation State
+  const [allPosts, setAllPosts] = useState<Post[]>([]);
+
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     if (currentUser?.role === 'ADMIN') {
         setGoals(storageService.getStrategicGoals());
         setVictories(storageService.getVictories());
+        // Fetch all posts for moderation
+        storageService.getPosts().then(setAllPosts);
     }
   }, [currentUser]);
 
@@ -130,6 +134,20 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
           const updatedList = storageService.deleteVictory(id);
           setVictories(updatedList);
       }
+  };
+
+  // --- POST MODERATION HANDLER ---
+  const handleDeletePost = async (id: string) => {
+    if (window.confirm("Voulez-vous vraiment supprimer cette publication de manière définitive ?")) {
+      try {
+        await storageService.deletePost(id);
+        setAllPosts(prev => prev.filter(p => p.id !== id));
+        setSuccessMsg('Publication supprimée avec succès.');
+        setTimeout(() => setSuccessMsg(''), 3000);
+      } catch (error: any) {
+        alert("Erreur lors de la suppression : " + error.message);
+      }
+    }
   };
 
   return (
@@ -247,6 +265,48 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
             >
               <Plus className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+
+        {/* POST MODERATION */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:col-span-2">
+           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+            <AlertOctagon className="w-5 h-5 mr-2 text-orange-500" />
+            Modération des Publications
+          </h3>
+          <p className="text-xs text-gray-500 mb-6">
+            Consultez les publications récentes et supprimez celles qui ne respectent pas la charte du Cluster.
+          </p>
+
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 border rounded-lg p-2 bg-gray-50">
+             {allPosts.length === 0 ? (
+               <p className="text-center text-gray-400 py-10">Aucune publication à afficher.</p>
+             ) : (
+               allPosts.map(post => (
+                 <div key={post.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow flex justify-between items-start">
+                    <div className="flex-1 pr-4">
+                       <div className="flex items-center space-x-2 mb-1">
+                          <span className="text-xs font-bold text-gray-800">{post.authorName}</span>
+                          <span className="text-[10px] text-gray-400">• {post.timestamp}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{post.type}</span>
+                       </div>
+                       <p className="text-sm text-gray-600 line-clamp-2">{post.content}</p>
+                       {post.image && (
+                         <div className="flex items-center mt-2 text-xs text-blue-500">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-1"></span> Image jointe
+                         </div>
+                       )}
+                    </div>
+                    <button 
+                      onClick={() => handleDeletePost(post.id)}
+                      className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors flex-shrink-0"
+                      title="Supprimer cette publication"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                 </div>
+               ))
+             )}
           </div>
         </div>
 

@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Member, Post, TrainingResource, Notification, StrategicGoal, ClusterVictory, DiscussionMessage, Comment } from '../types';
 import { MOCK_MEMBERS, MOCK_POSTS, MOCK_TRAININGS } from '../constants';
@@ -93,14 +94,16 @@ export const storageService = {
   },
 
   login: async (email: string, password: string): Promise<Member | null> => {
-    // We cannot mock login easily without compromising security logic flow in Auth.tsx
-    // So we let this throw if network fails, but Auth.tsx handles the error display.
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    if (data.user) {
-      return await storageService.getCurrentUser();
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (data.user) {
+        return await storageService.getCurrentUser();
+      }
+      return null;
+    } catch (error: any) {
+      throw new Error(error.message || "Échec de la connexion");
     }
-    return null;
   },
 
   logout: async () => {
@@ -119,102 +122,115 @@ export const storageService = {
   register: async (userData: Partial<Member> & { city?: string, address?: string, password?: string }): Promise<Member> => {
     if (!userData.email || !userData.password) throw new Error("Email et mot de passe requis");
 
-    const { data, error } = await supabase.auth.signUp({
-      email: userData.email,
-      password: userData.password,
-      options: {
-        data: {
-          name: userData.name,
-          businessName: userData.businessName
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            name: userData.name,
+            businessName: userData.businessName
+          }
         }
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        const CITY_COORDS: {[key: string]: {lat: number, lng: number}} = {
+          'Kinshasa': { lat: -4.4419, lng: 15.2663 },
+          'Pointe-Noire': { lat: -4.7855, lng: 11.8635 },
+          'Brazzaville': { lat: -4.2634, lng: 15.2429 },
+          'Lubumbashi': { lat: -11.6609, lng: 27.4794 },
+          'Goma': { lat: -1.6585, lng: 29.2205 },
+          'Matadi': { lat: -5.8405, lng: 13.4456 }
+        };
+        const baseCoords = CITY_COORDS[userData.city || 'Kinshasa'] || CITY_COORDS['Kinshasa'];
+        
+        // Reduce jitter to approx 500m (0.005 degrees) for better initial accuracy while keeping privacy
+        const jitter = () => (Math.random() - 0.5) * 0.005;
+
+        const { error: updateError } = await supabase.from('profiles').update({
+          sector: userData.sector,
+          city: userData.city,
+          address: userData.address,
+          role: userData.role || 'MEMBER',
+          latitude: baseCoords.lat + jitter(),
+          longitude: baseCoords.lng + jitter(),
+          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=random`
+        }).eq('id', data.user.id);
+
+        if (updateError) throw updateError;
+
+        invalidateCache('members');
+        
+        const user = await storageService.getCurrentUser();
+        if (!user) throw new Error("Erreur récupération profil après création");
+        return user;
       }
-    });
-
-    if (error) throw error;
-
-    if (data.user) {
-      const CITY_COORDS: {[key: string]: {lat: number, lng: number}} = {
-        'Kinshasa': { lat: -4.4419, lng: 15.2663 },
-        'Pointe-Noire': { lat: -4.7855, lng: 11.8635 },
-        'Brazzaville': { lat: -4.2634, lng: 15.2429 },
-        'Lubumbashi': { lat: -11.6609, lng: 27.4794 },
-        'Goma': { lat: -1.6585, lng: 29.2205 },
-        'Matadi': { lat: -5.8405, lng: 13.4456 }
-      };
-      const baseCoords = CITY_COORDS[userData.city || 'Kinshasa'] || CITY_COORDS['Kinshasa'];
-      
-      // Reduce jitter to approx 500m (0.005 degrees) for better initial accuracy while keeping privacy
-      const jitter = () => (Math.random() - 0.5) * 0.005;
-
-      await supabase.from('profiles').update({
-        sector: userData.sector,
-        city: userData.city,
-        address: userData.address,
-        role: userData.role || 'MEMBER',
-        latitude: baseCoords.lat + jitter(),
-        longitude: baseCoords.lng + jitter(),
-        avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=random`
-      }).eq('id', data.user.id);
-
-      invalidateCache('members'); // New member added
-      
-      const user = await storageService.getCurrentUser();
-      if (!user) throw new Error("Erreur récupération profil après création");
-      return user;
+      throw new Error("Erreur création utilisateur");
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      throw new Error(error.message || "Erreur lors de l'inscription");
     }
-    throw new Error("Erreur création utilisateur");
   },
 
   updateUserLocation: async (userId: string, coords: { lat: number, lng: number }, locationDetails?: { city?: string, address?: string }): Promise<void> => {
-    const updates: any = {
-      latitude: coords.lat,
-      longitude: coords.lng
-    };
-    if (locationDetails?.city) updates.city = locationDetails.city;
-    if (locationDetails?.address) updates.address = locationDetails.address;
+    try {
+      const updates: any = {
+        latitude: coords.lat,
+        longitude: coords.lng
+      };
+      if (locationDetails?.city) updates.city = locationDetails.city;
+      if (locationDetails?.address) updates.address = locationDetails.address;
 
-    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-    
-    if (error) {
+      const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+      
+      if (error) throw error;
+
+      // Update cache if it exists
+      if (CACHE.members.data) {
+         CACHE.members.data = CACHE.members.data.map(m => 
+           m.id === userId ? { 
+             ...m, 
+             location: { 
+               ...m.location, 
+               lat: coords.lat, 
+               lng: coords.lng,
+               ...(locationDetails?.city && { city: locationDetails.city }),
+               ...(locationDetails?.address && { address: locationDetails.address })
+             } 
+           } : m
+         );
+      } else {
+         invalidateCache('members');
+      }
+    } catch (error: any) {
       console.error("Error updating location:", error);
       throw new Error("Impossible de mettre à jour la localisation. " + error.message);
-    }
-    // Update cache if it exists
-    if (CACHE.members.data) {
-       CACHE.members.data = CACHE.members.data.map(m => 
-         m.id === userId ? { 
-           ...m, 
-           location: { 
-             ...m.location, 
-             lat: coords.lat, 
-             lng: coords.lng,
-             ...(locationDetails?.city && { city: locationDetails.city }),
-             ...(locationDetails?.address && { address: locationDetails.address })
-           } 
-         } : m
-       );
-    } else {
-       invalidateCache('members');
     }
   },
 
   updateUser: async (userId: string, updates: any): Promise<Member | null> => {
-    const dbUpdates: any = {};
-    if (updates.name) dbUpdates.name = updates.name;
-    if (updates.businessName) dbUpdates.business_name = updates.businessName;
-    if (updates.sector) dbUpdates.sector = updates.sector;
-    if (updates.city) dbUpdates.city = updates.city;
-    if (updates.address) dbUpdates.address = updates.address;
-    if (updates.avatar) dbUpdates.avatar_url = updates.avatar;
-    if (updates.role) dbUpdates.role = updates.role;
+    try {
+      const dbUpdates: any = {};
+      if (updates.name) dbUpdates.name = updates.name;
+      if (updates.businessName) dbUpdates.business_name = updates.businessName;
+      if (updates.sector) dbUpdates.sector = updates.sector;
+      if (updates.city) dbUpdates.city = updates.city;
+      if (updates.address) dbUpdates.address = updates.address;
+      if (updates.avatar) dbUpdates.avatar_url = updates.avatar;
+      if (updates.role) dbUpdates.role = updates.role;
 
-    const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId);
-    if (error) {
+      const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', userId);
+      if (error) throw error;
+
+      invalidateCache('members'); // Profile updated
+      return await storageService.getCurrentUser();
+    } catch (error: any) {
       console.error("Error updating profile:", error);
       throw new Error("Échec de la mise à jour du profil. " + error.message);
     }
-    invalidateCache('members'); // Profile updated
-    return await storageService.getCurrentUser();
   },
 
   getAllMembers: async (): Promise<Member[]> => {
@@ -270,19 +286,38 @@ export const storageService = {
   },
 
   addPost: async (post: Post): Promise<void> => {
-    const { error } = await supabase.from('posts').insert({
-      author_id: post.authorId,
-      content: post.content,
-      type: post.type,
-      image_url: post.image,
-      liked_by: [],
-      likes_count: 0
-    });
-    if (error) {
+    try {
+      const { error } = await supabase.from('posts').insert({
+        author_id: post.authorId,
+        content: post.content,
+        type: post.type,
+        image_url: post.image,
+        liked_by: [],
+        likes_count: 0
+      });
+      if (error) throw error;
+      invalidateCache('posts'); // Invalidate to show new post
+    } catch (error: any) {
       console.error("Add post error:", error);
       throw new Error("Impossible de publier le post. " + error.message);
     }
-    invalidateCache('posts'); // Invalidate to show new post
+  },
+
+  deletePost: async (postId: string): Promise<void> => {
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
+      
+      // Update cache immediately
+      if (CACHE.posts.data) {
+        CACHE.posts.data = CACHE.posts.data.filter(p => p.id !== postId);
+      } else {
+        invalidateCache('posts');
+      }
+    } catch (error: any) {
+      console.error("Delete post error:", error);
+      throw new Error("Impossible de supprimer la publication. " + error.message);
+    }
   },
 
   updatePost: async (post: Post): Promise<void> => {
@@ -319,7 +354,6 @@ export const storageService = {
        console.warn("Comment DB insert failed (RLS or Network), trying fallback for usability");
        
        // Fallback to LocalStorage so interaction isn't lost for the user
-       // Note: This matches previous fallback logic requested to fix RLS/Errors
        const localComments = JSON.parse(localStorage.getItem('pr_local_comments') || '[]');
        const newLocalComment = {
          id: `local-${Date.now()}`,
@@ -411,18 +445,20 @@ export const storageService = {
   },
 
   addTraining: async (training: TrainingResource): Promise<void> => {
-    const { error } = await supabase.from('trainings').insert({
-       title: training.title,
-       description: training.description,
-       type: training.type,
-       url: training.url,
-       duration: training.duration,
-       author_name: training.authorName
-    });
-    if (error) {
+    try {
+      const { error } = await supabase.from('trainings').insert({
+         title: training.title,
+         description: training.description,
+         type: training.type,
+         url: training.url,
+         duration: training.duration,
+         author_name: training.authorName
+      });
+      if (error) throw error;
+      invalidateCache('trainings');
+    } catch (error: any) {
        throw new Error("Impossible d'ajouter la formation. " + error.message);
     }
-    invalidateCache('trainings');
   },
 
   markTrainingCompleted: async (userId: string, trainingId: string): Promise<void> => {
@@ -530,52 +566,55 @@ export const storageService = {
   },
 
   addDiscussionMessage: async (msg: Partial<DiscussionMessage>): Promise<DiscussionMessage> => {
-     const { data, error } = await supabase.from('messages').insert({
-        author_id: msg.authorId,
-        content: msg.content
-     }).select('*, profiles(name, avatar_url)').single();
-     
-     if (error) {
+     try {
+       const { data, error } = await supabase.from('messages').insert({
+          author_id: msg.authorId,
+          content: msg.content
+       }).select('*, profiles(name, avatar_url)').single();
+       
+       if (error) throw error;
+       
+       // Formatted message
+       const formatted: DiscussionMessage = {
+          id: data.id,
+          authorId: data.author_id,
+          authorName: data.profiles?.name || 'Inconnu',
+          authorAvatar: data.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.profiles?.name || 'User')}&background=random`,
+          content: data.content,
+          timestamp: data.created_at,
+          displayTime: new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+       };
+
+       // Update cache immediately if exists
+       if (CACHE.messages.data) {
+          CACHE.messages.data = [...CACHE.messages.data, formatted];
+       } else {
+          CACHE.messages = { data: [formatted], timestamp: Date.now() };
+       }
+
+       return formatted;
+     } catch (error: any) {
         console.error("Error sending message:", error);
         throw new Error(error.message);
      }
-     
-     // Formatted message
-     const formatted: DiscussionMessage = {
-        id: data.id,
-        authorId: data.author_id,
-        authorName: data.profiles?.name || 'Inconnu',
-        authorAvatar: data.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(data.profiles?.name || 'User')}&background=random`,
-        content: data.content,
-        timestamp: data.created_at,
-        displayTime: new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-     };
-
-     // Update cache immediately if exists
-     if (CACHE.messages.data) {
-        CACHE.messages.data = [...CACHE.messages.data, formatted];
-     } else {
-        CACHE.messages = { data: [formatted], timestamp: Date.now() };
-     }
-
-     return formatted;
   },
 
   deleteDiscussionMessage: async (messageId: string): Promise<void> => {
-    // Use simple delete without select to avoid RLS read policy issues
-    const { error } = await supabase
-      .from('messages')
-      .delete()
-      .eq('id', messageId);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
 
-    if (error) {
+      if (error) throw error;
+      
+      // Crucial: Update cache locally immediately to prevent "ghost" messages
+      if (CACHE.messages.data) {
+        CACHE.messages.data = CACHE.messages.data.filter(m => m.id !== messageId);
+      }
+    } catch (error: any) {
       console.error("Delete error:", error);
       throw new Error(error.message);
-    }
-    
-    // Crucial: Update cache locally immediately to prevent "ghost" messages
-    if (CACHE.messages.data) {
-      CACHE.messages.data = CACHE.messages.data.filter(m => m.id !== messageId);
     }
   },
 
