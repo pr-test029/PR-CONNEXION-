@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -71,55 +70,55 @@ export const Dashboard: React.FC = () => {
       
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-dark-card p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Users className="w-16 h-16 text-primary-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Membres Actifs</p>
-            <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.totalMembers}</h3>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Membres Actifs</p>
+            <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.totalMembers}</h3>
           </div>
-          <div className="mt-4 flex items-center text-xs font-medium text-green-600 bg-green-50 w-fit px-2 py-1 rounded-full">
+          <div className="mt-4 flex items-center text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400 w-fit px-2 py-1 rounded-full">
             <ArrowUpRight className="w-3 h-3 mr-1" />
             +12% ce mois
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-dark-card p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Award className="w-16 h-16 text-blue-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Taux Certification</p>
-            <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.certificationRate}%</h3>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Taux Certification</p>
+            <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.certificationRate}%</h3>
           </div>
-          <div className="mt-4 w-full bg-gray-100 rounded-full h-1.5">
+          <div className="mt-4 w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
             <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${stats.certificationRate}%` }}></div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-dark-card p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <TrendingUp className="w-16 h-16 text-green-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Histoires de Succès</p>
-            <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.successStories}</h3>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Histoires de Succès</p>
+            <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.successStories}</h3>
           </div>
-          <div className="mt-4 flex items-center text-xs text-gray-500">
+          <div className="mt-4 flex items-center text-xs text-gray-500 dark:text-gray-400">
             Inspirant la communauté
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="bg-white dark:bg-dark-card p-5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <MessageCircle className="w-16 h-16 text-orange-500" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Interactions</p>
-            <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.engagement}</h3>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interactions</p>
+            <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{stats.engagement}</h3>
           </div>
-          <div className="mt-4 flex items-center text-xs font-medium text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded-full">
+          <div className="mt-4 flex items-center text-xs font-medium text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400 w-fit px-2 py-1 rounded-full">
             <Zap className="w-3 h-3 mr-1" />
             Très Actif
           </div>
@@ -130,8 +129,8 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Sector Distribution */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+        <div className="bg-white dark:bg-dark-card p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-1">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center">
             <Target className="w-5 h-5 mr-2 text-primary-600" />
             Répartition par Secteur
           </h3>
@@ -158,19 +157,19 @@ export const Dashboard: React.FC = () => {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 text-center text-xs text-gray-500">
+          <div className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
             Le secteur Agroalimentaire domine actuellement le cluster.
           </div>
         </div>
 
         {/* Activity Analysis */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+        <div className="bg-white dark:bg-dark-card p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
-             <h3 className="text-lg font-bold text-gray-900 flex items-center">
+             <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
                 <TrendingUp className="w-5 h-5 mr-2 text-primary-600" />
                 Dynamique du Cluster (Posts)
              </h3>
-             <select className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-gray-50 outline-none">
+             <select className="text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 bg-gray-50 dark:bg-gray-700 outline-none dark:text-white">
                 <option>Ce mois</option>
                 <option>3 derniers mois</option>
              </select>
@@ -198,7 +197,7 @@ export const Dashboard: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="mt-2 text-xs text-gray-500 text-center italic">
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center italic">
             Analyse en temps réel des types d'échanges sur la plateforme.
           </p>
         </div>
@@ -209,7 +208,7 @@ export const Dashboard: React.FC = () => {
         
         <div className="lg:col-span-2 hidden lg:block">
            {/* Placeholder for layout balance or future content */}
-           <div className="h-full bg-gray-50 border border-dashed border-gray-200 rounded-xl flex items-center justify-center p-6 text-gray-400 text-sm">
+           <div className="h-full bg-gray-50 dark:bg-gray-900/50 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl flex items-center justify-center p-6 text-gray-400 text-sm">
              Espace réservé pour futures analyses (Flux financier, etc.)
            </div>
         </div>

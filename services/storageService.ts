@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { Member, Post, TrainingResource, Notification, StrategicGoal, ClusterVictory, DiscussionMessage, Comment } from '../types';
 import { MOCK_MEMBERS, MOCK_POSTS, MOCK_TRAININGS } from '../constants';
@@ -31,7 +30,7 @@ const mapPostToApp = (p: any): Post => ({
   content: p.content,
   type: p.type,
   likes: p.likes_count || 0,
-  comments: p.comments ? p.comments[0]?.count : 0,
+  comments: p.comments?.[0]?.count || 0, // Safer access
   timestamp: new Date(p.created_at).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'}),
   image: p.image_url,
   likedBy: p.liked_by || [],
@@ -41,7 +40,7 @@ const mapPostToApp = (p: any): Post => ({
 });
 
 // --- CACHE SYSTEM ---
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes cache
 const CACHE = {
   members: { data: null as Member[] | null, timestamp: 0 },
   posts: { data: null as Post[] | null, timestamp: 0 },
@@ -66,7 +65,10 @@ export const storageService = {
   getCurrentUser: async (): Promise<Member | null> => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.warn("Session check error:", sessionError);
+        return null;
+      }
       if (!session?.user) return null;
 
       // Check cache for members first to avoid refetching own profile if not needed
@@ -82,8 +84,6 @@ export const storageService = {
         .single();
 
       if (error) {
-         // If profile doesn't exist but user does, it might be a sync issue or first login
-         // We don't have a mock fallback for "me" specifically without a session context
          return null;
       }
       return mapProfileToMember({ ...profile, email: session.user.email });
@@ -233,8 +233,9 @@ export const storageService = {
     }
   },
 
-  getAllMembers: async (): Promise<Member[]> => {
-    if (isCacheValid('members') && CACHE.members.data) {
+  getAllMembers: async (forceRefresh = false): Promise<Member[]> => {
+    // Return Cached Data immediately if valid and not forced
+    if (!forceRefresh && isCacheValid('members') && CACHE.members.data) {
       return CACHE.members.data;
     }
 
@@ -247,7 +248,6 @@ export const storageService = {
       return members;
     } catch (e) {
       console.warn("Fetch members failed, using fallback.", e);
-      // Return cache if exists, otherwise return Mock data
       if (CACHE.members.data) return CACHE.members.data;
       return MOCK_MEMBERS;
     }
@@ -255,7 +255,7 @@ export const storageService = {
 
   // POSTS
   getPosts: async (forceRefresh = false): Promise<Post[]> => {
-    // If not forcing refresh and cache is valid, return cache
+    // Return Cached Data immediately if valid and not forced
     if (!forceRefresh && isCacheValid('posts') && CACHE.posts.data) {
       return CACHE.posts.data;
     }
@@ -277,10 +277,7 @@ export const storageService = {
     } catch (error: any) {
       console.warn("GetPosts failed (network or DB), using fallback:", error.message);
       
-      // Return stale cache if available
       if (CACHE.posts.data) return CACHE.posts.data;
-
-      // Return Mocks as last resort to prevent app crash
       return MOCK_POSTS;
     }
   },
@@ -335,13 +332,11 @@ export const storageService = {
       if (error) throw error;
     } catch (error: any) {
       console.error("Failed to update post:", error.message);
-      // Suppress error visually, just log it. UX is already optimistic.
     }
   },
 
   addComment: async (postId: string, content: string, authorId?: string): Promise<void> => {
      try {
-       // Strictly try to insert into DB.
        const { error } = await supabase.from('comments').insert({
           post_id: postId,
           author_id: authorId || null, 
@@ -349,11 +344,10 @@ export const storageService = {
        });
 
        if (error) throw error;
-       invalidateCache('posts'); // Invalidate to update comment counts globally
+       // We don't necessarily invalidate posts cache here to avoid full reload if not needed
      } catch (e: any) {
        console.warn("Comment DB insert failed (RLS or Network), trying fallback for usability");
        
-       // Fallback to LocalStorage so interaction isn't lost for the user
        const localComments = JSON.parse(localStorage.getItem('pr_local_comments') || '[]');
        const newLocalComment = {
          id: `local-${Date.now()}`,
@@ -364,14 +358,11 @@ export const storageService = {
          is_local: true
        };
        localStorage.setItem('pr_local_comments', JSON.stringify([...localComments, newLocalComment]));
-       
-       invalidateCache('posts');
      }
   },
 
   getCommentsForPost: async (postId: string): Promise<Comment[]> => {
      try {
-       // Fetch strictly from DB
        const { data, error } = await supabase
           .from('comments')
           .select('*, profiles(name)')
@@ -387,7 +378,6 @@ export const storageService = {
           timestamp: new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
        }));
 
-       // Merge with Local Storage fallbacks (if any existed from previous errors)
        const localComments = JSON.parse(localStorage.getItem('pr_local_comments') || '[]')
          .filter((c: any) => c.post_id === postId)
          .map((c: any) => ({
@@ -401,7 +391,6 @@ export const storageService = {
 
      } catch (e) {
        console.warn("Fetch comments failed", e);
-       // Return local comments if DB fails completely
        const localComments = JSON.parse(localStorage.getItem('pr_local_comments') || '[]')
          .filter((c: any) => c.post_id === postId)
          .map((c: any) => ({
@@ -415,8 +404,9 @@ export const storageService = {
   },
 
   // TRAININGS
-  getTrainings: async (): Promise<TrainingResource[]> => {
-    if (isCacheValid('trainings') && CACHE.trainings.data) {
+  getTrainings: async (forceRefresh = false): Promise<TrainingResource[]> => {
+    // Return Cached Data immediately if valid
+    if (!forceRefresh && isCacheValid('trainings') && CACHE.trainings.data) {
       return CACHE.trainings.data;
     }
 
@@ -469,12 +459,10 @@ export const storageService = {
           if (!current.includes(trainingId)) {
              const updated = [...current, trainingId];
              
-             // Get total for percentage (use cache if available)
              let total = 1;
              if (isCacheValid('trainings') && CACHE.trainings.data) {
                 total = CACHE.trainings.data.length || 1;
              } else {
-                // Approximate fallback if no cache/network
                 total = 10;
              }
 
@@ -485,7 +473,7 @@ export const storageService = {
                 training_progress: progress
              }).eq('id', userId);
              
-             invalidateCache('members'); // Update member stats
+             invalidateCache('members'); 
           }
        }
      } catch (e) {
@@ -494,22 +482,16 @@ export const storageService = {
   },
 
   // DISCUSSION
-  // Sync helper to get cache immediately if available
   getCachedMessages: (): DiscussionMessage[] => {
     return CACHE.messages.data || [];
   },
 
-  // Allow UI to push updates to cache (keeps cache fresh on Realtime events)
   syncMessageCache: (messages: DiscussionMessage[]) => {
     CACHE.messages = { data: messages, timestamp: Date.now() };
   },
 
   getDiscussionMessages: async (limit = 10, beforeTimestamp?: string): Promise<DiscussionMessage[]> => {
-    // If no beforeTimestamp is provided, we might look at cache
-    // But since we want to handle pagination robustly, we often hit DB for older chunks.
-    // We only return cache if it's the *initial* load (no cursor) and it's populated.
     if (!beforeTimestamp && isCacheValid('messages') && CACHE.messages.data && CACHE.messages.data.length >= limit) {
-      // Just return the cached amount requested (slice from end as cache is chronological)
       return CACHE.messages.data.slice(-limit);
     }
 
@@ -517,7 +499,7 @@ export const storageService = {
       let query = supabase
         .from('messages')
         .select('*, profiles(name, avatar_url)')
-        .order('created_at', { ascending: false }) // Newest first
+        .order('created_at', { ascending: false })
         .limit(limit);
 
       if (beforeTimestamp) {
@@ -529,7 +511,6 @@ export const storageService = {
       if (error) throw error;
       if (!data) return [];
       
-      // Reverse to display chronologically (Oldest -> Newest) in the chat
       const newMessages = data.reverse().map((m: any) => ({
         id: m.id,
         authorId: m.author_id,
@@ -540,17 +521,9 @@ export const storageService = {
         displayTime: new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       }));
 
-      // Update Cache Strategy:
-      // If it's an initial load, replace cache.
-      // If it's pagination (beforeTimestamp), prepend to cache.
       if (!beforeTimestamp) {
-         // It's the latest chunk. If we have existing cache, we might want to be smart, 
-         // but strictly speaking, if we asked for latest and got it, we can seed the cache.
-         // However, to keep it simple and safe:
          CACHE.messages = { data: newMessages, timestamp: Date.now() };
       } else if (CACHE.messages.data) {
-         // We fetched older messages. Prepend them to the known cache.
-         // Filter duplicates just in case
          const existingIds = new Set(CACHE.messages.data.map(m => m.id));
          const uniqueNew = newMessages.filter(m => !existingIds.has(m.id));
          CACHE.messages.data = [...uniqueNew, ...CACHE.messages.data];
@@ -559,7 +532,6 @@ export const storageService = {
       return newMessages;
     } catch (e) {
       console.warn("Fetch messages failed", e);
-      // Return empty or cache if exists
       if (CACHE.messages.data && !beforeTimestamp) return CACHE.messages.data.slice(-limit);
       return [];
     }
@@ -574,7 +546,6 @@ export const storageService = {
        
        if (error) throw error;
        
-       // Formatted message
        const formatted: DiscussionMessage = {
           id: data.id,
           authorId: data.author_id,
@@ -585,7 +556,6 @@ export const storageService = {
           displayTime: new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
        };
 
-       // Update cache immediately if exists
        if (CACHE.messages.data) {
           CACHE.messages.data = [...CACHE.messages.data, formatted];
        } else {
@@ -608,7 +578,6 @@ export const storageService = {
 
       if (error) throw error;
       
-      // Crucial: Update cache locally immediately to prevent "ghost" messages
       if (CACHE.messages.data) {
         CACHE.messages.data = CACHE.messages.data.filter(m => m.id !== messageId);
       }

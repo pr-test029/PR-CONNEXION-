@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { storageService } from '../services/storageService';
 import { AppView, Member, TrainingResource } from '../types';
@@ -170,7 +169,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
       {!isOwnProfile && (
         <button 
           onClick={() => setView(AppView.FEED)}
-          className="flex items-center text-gray-600 hover:text-primary-600 transition-colors mb-2 font-medium"
+          className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors mb-2 font-medium"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
           Retour au fil d'actualité
@@ -178,7 +177,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
       )}
 
       {/* Header Card */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative overflow-hidden group">
+      <div className="bg-white dark:bg-dark-card rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 relative overflow-hidden group">
         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-primary-600 to-primary-800"></div>
         
         {isOwnProfile && (
@@ -197,10 +196,10 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
              <img 
               src={user.avatar} 
               alt="Profile" 
-              className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-white"
+              className="w-24 h-24 rounded-full border-4 border-white dark:border-dark-card shadow-md object-cover bg-white"
             />
             {user.role === 'ADMIN' && (
-              <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-sm border border-gray-100">
+              <div className="absolute bottom-0 right-0 bg-white dark:bg-dark-card rounded-full p-1 shadow-sm border border-gray-100 dark:border-gray-700">
                  <div className="bg-red-500 rounded-full p-1">
                    <ShieldCheck className="w-3 h-3 text-white" />
                  </div>
@@ -209,39 +208,39 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
           </div>
           
           <div className="flex-1 text-center md:text-left mb-2">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center justify-center md:justify-start">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center md:justify-start">
               {user.name}
               {user.role === 'ADMIN' ? (
-                <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full flex items-center">
+                <span className="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold rounded-full flex items-center">
                   <ShieldCheck className="w-3 h-3 mr-1" /> Admin
                 </span>
               ) : (
-                <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-bold rounded-full flex items-center">
+                <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-full flex items-center">
                    Membre
                 </span>
               )}
             </h1>
-            <p className="text-gray-600 font-medium">{user.businessName} - {user.sector}</p>
-            <p className="text-xs text-gray-500 mt-1">{user.location.address}, {user.location.city}</p>
+            <p className="text-gray-600 dark:text-gray-300 font-medium">{user.businessName} - {user.sector}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{user.location.address}, {user.location.city}</p>
             <div className="flex items-center justify-center md:justify-start mt-2 space-x-2">
               {user.badges.map(badge => (
-                <span key={badge} className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded uppercase flex items-center">
+                <span key={badge} className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-bold rounded uppercase flex items-center">
                   <Award className="w-3 h-3 mr-1" /> {badge}
                 </span>
               ))}
-              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded uppercase flex items-center">
+              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold rounded uppercase flex items-center">
                 <CheckCircle className="w-3 h-3 mr-1" /> {user.status}
               </span>
             </div>
           </div>
           <div className="flex space-x-3 pb-2">
-             <div className="text-center px-4 border-r border-gray-200">
-                <span className="block text-lg font-bold text-gray-900">12</span>
-                <span className="text-xs text-gray-500">Projets</span>
+             <div className="text-center px-4 border-r border-gray-200 dark:border-gray-700">
+                <span className="block text-lg font-bold text-gray-900 dark:text-white">12</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Projets</span>
              </div>
              <div className="text-center px-4">
-                <span className="block text-lg font-bold text-gray-900">{progressPercentage}%</span>
-                <span className="text-xs text-gray-500">Progression</span>
+                <span className="block text-lg font-bold text-gray-900 dark:text-white">{progressPercentage}%</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Progression</span>
              </div>
           </div>
         </div>
@@ -249,9 +248,9 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Evolution Chart & Data Entry */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white dark:bg-dark-card p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
               <TrendingUp className="w-5 h-5 mr-2 text-primary-600" />
               {isOwnProfile ? 'Mon Évolution Financière' : `Évolution de ${user.name.split(' ')[0]}`}
             </h2>
@@ -261,8 +260,8 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
                 onClick={() => setIsEditingFinance(!isEditingFinance)}
                 className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   isEditingFinance 
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50' 
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 {isEditingFinance ? <Save className="w-4 h-4 mr-1" /> : <Edit2 className="w-4 h-4 mr-1" />}
@@ -273,27 +272,27 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
 
           {/* Data Entry Grid (Visible when editing) */}
           {isEditingFinance && isOwnProfile && (
-            <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200 animate-in slide-in-from-top-2">
-              <p className="text-xs text-gray-500 mb-3 font-medium">Saisissez vos montants mensuels pour mettre à jour le graphique :</p>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-2 max-h-60 overflow-y-auto pr-2">
+            <div className="mb-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 animate-in slide-in-from-top-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 font-medium">Saisissez vos montants mensuels pour mettre à jour le graphique :</p>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                 <div className="text-xs font-bold text-gray-400 uppercase">Mois</div>
                 <div className="text-xs font-bold text-red-500 uppercase">C.A. (FC)</div>
                 <div className="text-xs font-bold text-blue-500 uppercase">Capital (FC)</div>
                 
                 {financialData.map((data, idx) => (
                   <React.Fragment key={data.month}>
-                    <div className="flex items-center text-sm font-medium text-gray-700">{data.month}</div>
+                    <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">{data.month}</div>
                     <input 
                       type="number" 
                       value={data.CA} 
                       onChange={(e) => handleFinanceChange(idx, 'CA', e.target.value)}
-                      className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-500 outline-none"
+                      className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-500 outline-none dark:text-white"
                     />
                     <input 
                       type="number" 
                       value={data.Capital} 
                       onChange={(e) => handleFinanceChange(idx, 'Capital', e.target.value)}
-                      className="w-full bg-white border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-500 outline-none"
+                      className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-500 outline-none dark:text-white"
                     />
                   </React.Fragment>
                 ))}
@@ -328,8 +327,8 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
         </div>
 
         {/* Training Timeline / History */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-[450px]">
-           <h2 className="text-lg font-bold text-gray-900 flex items-center mb-6 shrink-0">
+        <div className="bg-white dark:bg-dark-card p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col h-[450px]">
+           <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center mb-6 shrink-0">
               <Briefcase className="w-5 h-5 mr-2 text-primary-600" />
               {isOwnProfile ? 'Mon Parcours de Formation' : 'Formations suivies'}
             </h2>
@@ -342,34 +341,34 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
                   <div key={training.id} className="relative flex items-start group pb-6 last:pb-0">
                     {/* Line */}
                     {index !== profileTrainings.length - 1 && (
-                      <div className="absolute left-[11px] top-7 h-full w-0.5 bg-gray-100 group-hover:bg-primary-100 transition-colors"></div>
+                      <div className="absolute left-[11px] top-7 h-full w-0.5 bg-gray-100 dark:bg-gray-700 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/50 transition-colors"></div>
                     )}
                     
                     {/* Status Icon */}
                     <div className={`
-                      relative z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white mr-4 shrink-0 transition-all
+                      relative z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white dark:bg-dark-card mr-4 shrink-0 transition-all
                       ${training.completed 
                         ? 'border-green-500 text-green-500' 
-                        : 'border-gray-300 text-gray-400'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-400'
                       }
                     `}>
                       {training.completed ? (
                         <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
                       ) : (
-                        <div className="w-2.5 h-2.5 bg-gray-200 rounded-full"></div>
+                        <div className="w-2.5 h-2.5 bg-gray-200 dark:bg-gray-600 rounded-full"></div>
                       )}
                     </div>
 
                     <div className="flex-1 pt-0.5">
                       <div className="flex justify-between items-start">
-                        <h4 className={`text-sm font-bold transition-colors ${training.completed ? 'text-gray-900' : 'text-gray-500'}`}>
+                        <h4 className={`text-sm font-bold transition-colors ${training.completed ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
                           {training.title}
                         </h4>
-                        <span className="text-[10px] font-medium px-2 py-0.5 bg-gray-100 rounded-full text-gray-500 whitespace-nowrap ml-2">
+                        <span className="text-[10px] font-medium px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
                           {training.type}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">{training.description}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-1">{training.description}</p>
                       
                       {training.completed ? (
                          <span className="text-xs text-green-600 font-medium flex items-center mt-1">
@@ -380,7 +379,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
                          isOwnProfile && (
                            <button 
                              onClick={() => setView(AppView.TRAINING)}
-                             className="text-xs text-primary-600 font-medium flex items-center mt-1 hover:underline"
+                             className="text-xs text-primary-600 dark:text-primary-400 font-medium flex items-center mt-1 hover:underline"
                            >
                              <PlayCircle className="w-3 h-3 mr-1" /> Commencer
                            </button>
@@ -395,7 +394,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
             {isOwnProfile && (
                <button 
                 onClick={() => setView(AppView.TRAINING)}
-                className="w-full mt-4 bg-gray-50 text-primary-600 font-bold py-3 rounded-lg hover:bg-primary-50 hover:text-primary-700 hover:shadow-sm transition-all border-2 border-dashed border-primary-200 flex items-center justify-center shrink-0"
+                className="w-full mt-4 bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400 font-bold py-3 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-700 hover:shadow-sm transition-all border-2 border-dashed border-primary-200 dark:border-gray-700 flex items-center justify-center shrink-0"
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Accéder au catalogue complet
@@ -407,13 +406,13 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
       {/* EDIT PROFILE MODAL */}
       {isEditProfileModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center">
+          <div className="bg-white dark:bg-dark-card rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center shrink-0">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
                 <UserCog className="w-5 h-5 mr-2 text-primary-600" />
                 Modifier mes informations
               </h3>
-              <button onClick={() => setIsEditProfileModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setIsEditProfileModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -426,16 +425,16 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
                    <img 
                     src={previewAvatar || editForm.name} // Fallback safe
                     alt="Avatar Preview" 
-                    className="w-24 h-24 rounded-full object-cover border-4 border-gray-100 group-hover:border-primary-200 transition-colors"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-gray-100 dark:border-gray-700 group-hover:border-primary-200 transition-colors"
                    />
                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <Camera className="w-8 h-8 text-white" />
                    </div>
-                   <div className="absolute bottom-0 right-0 bg-primary-600 p-1.5 rounded-full border-2 border-white shadow-sm">
+                   <div className="absolute bottom-0 right-0 bg-primary-600 p-1.5 rounded-full border-2 border-white dark:border-dark-card shadow-sm">
                       <Upload className="w-3 h-3 text-white" />
                    </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Cliquez pour changer la photo</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Cliquez pour changer la photo</p>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
@@ -446,15 +445,15 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
               </div>
 
               {/* Role Toggle Section */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                 <label className="block text-xs font-bold text-gray-700 uppercase mb-3">Mon Statut Cluster</label>
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-3">Mon Statut Cluster</label>
                  <div className="flex space-x-3">
                     <button
                       onClick={() => setEditForm({ ...editForm, role: 'MEMBER' })}
                       className={`flex-1 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
                         editForm.role === 'MEMBER' 
-                        ? 'bg-white border-primary-500 text-primary-700 shadow-sm' 
-                        : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200'
+                        ? 'bg-white dark:bg-gray-700 border-primary-500 text-primary-700 dark:text-primary-400 shadow-sm' 
+                        : 'bg-gray-100 dark:bg-gray-900 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
                       }`}
                     >
                       Membre
@@ -463,15 +462,15 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
                       onClick={() => setEditForm({ ...editForm, role: 'ADMIN' })}
                       className={`flex-1 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
                         editForm.role === 'ADMIN' 
-                        ? 'bg-white border-red-500 text-red-700 shadow-sm' 
-                        : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200'
+                        ? 'bg-white dark:bg-gray-700 border-red-500 text-red-700 dark:text-red-400 shadow-sm' 
+                        : 'bg-gray-100 dark:bg-gray-900 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
                       }`}
                     >
                       <ShieldCheck className="w-4 h-4 mr-2" />
                       Administrateur
                     </button>
                  </div>
-                 <p className="text-[10px] text-gray-400 mt-2 text-center">
+                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 text-center">
                    {editForm.role === 'ADMIN' 
                      ? "En tant qu'administrateur, vous pourrez gérer les annonces et la stratégie." 
                      : "Le statut membre vous permet de publier et suivre des formations."}
@@ -479,31 +478,31 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nom Complet</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Nom Complet</label>
                 <input 
                   type="text" 
                   value={editForm.name}
                   onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                   <label className="block text-sm font-bold text-gray-700 mb-1">Entreprise</label>
+                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Entreprise</label>
                    <input 
                     type="text" 
                     value={editForm.businessName}
                     onChange={(e) => setEditForm({...editForm, businessName: e.target.value})}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:text-white"
                   />
                 </div>
                 <div>
-                   <label className="block text-sm font-bold text-gray-700 mb-1">Secteur</label>
+                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Secteur</label>
                    <select 
                       value={editForm.sector}
                       onChange={(e) => setEditForm({...editForm, sector: e.target.value})}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:text-white"
                     >
                       <option value="Agroalimentaire">Agroalimentaire</option>
                       <option value="Textile">Textile</option>
@@ -517,11 +516,11 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
 
               <div className="grid grid-cols-2 gap-4">
                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Ville</label>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Ville</label>
                     <select 
                       value={editForm.city}
                       onChange={(e) => setEditForm({...editForm, city: e.target.value})}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:text-white"
                     >
                       <option value="Kinshasa">Kinshasa</option>
                       <option value="Pointe-Noire">Pointe-Noire</option>
@@ -532,38 +531,38 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
                     </select>
                  </div>
                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Adresse</label>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Adresse</label>
                     <input 
                       type="text" 
                       value={editForm.address}
                       onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:text-white"
                     />
                  </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Email</label>
                 <input 
                   type="email" 
                   value={editForm.email}
                   onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:text-white"
                 />
               </div>
               
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-                 <p className="text-xs text-yellow-800">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-3 rounded">
+                 <p className="text-xs text-yellow-800 dark:text-yellow-300">
                    Note: La modification de votre ville mettra automatiquement à jour votre position sur la carte des membres.
                  </p>
               </div>
 
             </div>
             
-            <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end space-x-3 shrink-0">
+            <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl flex justify-end space-x-3 shrink-0">
               <button 
                 onClick={() => setIsEditProfileModalOpen(false)}
-                className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 Annuler
               </button>
