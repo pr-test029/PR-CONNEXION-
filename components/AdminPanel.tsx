@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../services/storageService';
 import { StrategicGoal, Notification, ClusterVictory, Member, Post } from '../types';
-import { Bell, Send, CheckCircle, Plus, Trash2, Target, ShieldAlert, Trophy, Edit2, Save, X, Lock, MessageSquare, AlertOctagon } from 'lucide-react';
+import { Bell, Send, CheckCircle, Plus, Trash2, Target, ShieldAlert, Trophy, Edit2, Save, X, Lock, MessageSquare, AlertOctagon, Loader2 } from 'lucide-react';
 
 export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}) => {
 
@@ -21,15 +21,21 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
 
   // Posts Moderation State
   const [allPosts, setAllPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (currentUser?.role === 'ADMIN') {
         setGoals(storageService.getStrategicGoals());
         setVictories(storageService.getVictories());
-        // Fetch all posts for moderation
-        storageService.getPosts().then(setAllPosts);
+        
+        setLoadingPosts(true);
+        storageService.getPosts()
+          .then(setAllPosts)
+          .catch(err => console.error("Failed to load posts for moderation", err))
+          .finally(() => setLoadingPosts(false));
     }
   }, [currentUser]);
 
@@ -138,14 +144,22 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
 
   // --- POST MODERATION HANDLER ---
   const handleDeletePost = async (id: string) => {
-    if (window.confirm("Voulez-vous vraiment supprimer cette publication de manière définitive ?")) {
+    if (window.confirm("Voulez-vous vraiment supprimer cette publication de manière définitive ? Cette action est irréversible.")) {
       try {
         await storageService.deletePost(id);
+        
+        // Update local state immediately to remove the deleted post
         setAllPosts(prev => prev.filter(p => p.id !== id));
+        
+        // Show success message
         setSuccessMsg('Publication supprimée avec succès.');
         setTimeout(() => setSuccessMsg(''), 3000);
+        
       } catch (error: any) {
-        alert("Erreur lors de la suppression : " + error.message);
+        console.error("Deletion failed", error);
+        setErrorMsg(`Erreur lors de la suppression : ${error.message}`);
+        setTimeout(() => setErrorMsg(''), 5000);
+        alert(`Impossible de supprimer la publication : ${error.message}`);
       }
     }
   };
@@ -168,6 +182,13 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative animate-in fade-in slide-in-from-top-2">
           <strong className="font-bold">Succès! </strong>
           <span className="block sm:inline">{successMsg}</span>
+        </div>
+      )}
+      
+      {errorMsg && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative animate-in fade-in slide-in-from-top-2">
+          <strong className="font-bold">Erreur! </strong>
+          <span className="block sm:inline">{errorMsg}</span>
         </div>
       )}
 
@@ -279,7 +300,9 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
           </p>
 
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-gray-50 dark:bg-gray-900/50 custom-scrollbar">
-             {allPosts.length === 0 ? (
+             {loadingPosts ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>
+             ) : allPosts.length === 0 ? (
                <p className="text-center text-gray-400 py-10">Aucune publication à afficher.</p>
              ) : (
                allPosts.map(post => (
