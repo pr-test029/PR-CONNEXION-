@@ -1,430 +1,358 @@
-import { supabase } from './supabaseClient';
+
 import { Member, Post, TrainingResource, Notification, StrategicGoal, ClusterVictory, DiscussionMessage, Comment } from '../types';
 import { MOCK_MEMBERS, MOCK_POSTS, MOCK_TRAININGS } from '../constants';
 
-// --- MAPPERS (SQL -> TypeScript) ---
-const mapProfileToMember = (p: any): Member => ({
-  id: p.id,
-  name: p.name || 'Utilisateur',
-  email: p.email,
-  businessName: p.business_name || '',
-  sector: p.sector || '',
-  location: {
-    lat: p.latitude || 0,
-    lng: p.longitude || 0,
-    address: p.address || '',
-    city: p.city || ''
-  },
-  avatar: p.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'User')}&background=random`,
-  joinedDate: new Date(p.joined_date).toLocaleDateString(),
-  status: p.status || 'En Formation',
-  trainingProgress: p.training_progress || 0,
-  badges: p.badges || [],
-  role: p.role || 'MEMBER',
-  completedTrainings: p.completed_trainings || []
-});
+/**
+ * SERVICE DE STOCKAGE NEON (Simulation)
+ * Dans un environnement de production, ce service communiquerait avec une API 
+ * connectée à votre base de données PostgreSQL sur Neon.tech.
+ */
 
-const mapPostToApp = (p: any): Post => ({
-  id: p.id,
-  authorId: p.author_id,
-  content: p.content,
-  type: p.type,
-  likes: p.likes_count || 0,
-  comments: p.comments ? p.comments[0]?.count : 0,
-  timestamp: new Date(p.created_at).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'}),
-  image: p.image_url,
-  likedBy: p.liked_by || [],
-  commentsList: [],
-  authorName: p.profiles?.name || 'Membre Cluster',
-  authorAvatar: p.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.profiles?.name || 'User')}&background=random`
-});
+// Simulation de la base de données asynchrone (Postgres latency simulation)
+const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// --- CACHE SYSTEM ---
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes cache
-const CACHE = {
-  members: { data: null as Member[] | null, timestamp: 0 },
-  posts: { data: null as Post[] | null, timestamp: 0 },
-  trainings: { data: null as TrainingResource[] | null, timestamp: 0 },
-  messages: { data: null as DiscussionMessage[] | null, timestamp: 0 }
+const DB_KEYS = {
+  MEMBERS: 'neon_db_members',
+  POSTS: 'neon_db_posts',
+  TRAININGS: 'neon_db_trainings',
+  MESSAGES: 'neon_db_messages',
+  COMMENTS: 'neon_db_comments',
+  GOALS: 'neon_db_goals',
+  VICTORIES: 'neon_db_victories',
+  NOTIFS: 'neon_db_notifs',
+  SESSION: 'neon_auth_session'
 };
 
-const isCacheValid = (key: keyof typeof CACHE) => {
-  return CACHE[key].data && (Date.now() - CACHE[key].timestamp < CACHE_DURATION);
+// Initialisation de la base de données locale (Neon Initial State)
+const initDB = () => {
+  if (!localStorage.getItem(DB_KEYS.MEMBERS)) {
+    localStorage.setItem(DB_KEYS.MEMBERS, JSON.stringify(MOCK_MEMBERS));
+  }
+  if (!localStorage.getItem(DB_KEYS.POSTS)) {
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify(MOCK_POSTS));
+  }
+  if (!localStorage.getItem(DB_KEYS.TRAININGS)) {
+    localStorage.setItem(DB_KEYS.TRAININGS, JSON.stringify(MOCK_TRAININGS));
+  }
+  if (!localStorage.getItem(DB_KEYS.GOALS)) {
+    localStorage.setItem(DB_KEYS.GOALS, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(DB_KEYS.VICTORIES)) {
+    localStorage.setItem(DB_KEYS.VICTORIES, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(DB_KEYS.NOTIFS)) {
+    localStorage.setItem(DB_KEYS.NOTIFS, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(DB_KEYS.MESSAGES)) {
+    localStorage.setItem(DB_KEYS.MESSAGES, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(DB_KEYS.COMMENTS)) {
+    localStorage.setItem(DB_KEYS.COMMENTS, JSON.stringify({}));
+  }
 };
 
-const invalidateCache = (key: keyof typeof CACHE) => {
-  CACHE[key].timestamp = 0;
-  CACHE[key].data = null;
-};
-
-// --- SERVICE ---
+initDB();
 
 export const storageService = {
   
-  // AUTH
+  // --- AUTHENTIFICATION (Simulée pour Neon) ---
+  
   getCurrentUser: async (): Promise<Member | null> => {
-    try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      if (!session?.user) return null;
-
-      if (isCacheValid('members') && CACHE.members.data) {
-        const cachedUser = CACHE.members.data.find(m => m.id === session.user.id);
-        if (cachedUser) return { ...cachedUser, email: session.user.email };
-      }
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error) return null;
-      return mapProfileToMember({ ...profile, email: session.user.email });
-    } catch (e) {
-      console.warn("Auth check failed:", e);
-      return null;
-    }
+    await wait(100);
+    const sessionUserId = localStorage.getItem(DB_KEYS.SESSION);
+    if (!sessionUserId) return null;
+    
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    return members.find(m => m.id === sessionUserId) || null;
   },
 
   login: async (email: string, password: string): Promise<Member | null> => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw new Error(error.message);
-      if (data.user) {
-        return await storageService.getCurrentUser();
-      }
-      return null;
-    } catch (error: any) {
-      throw new Error(error.message || "Échec de la connexion au serveur.");
+    await wait(500);
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    const user = members.find(m => m.email === email && m.password === password);
+    
+    if (user) {
+      localStorage.setItem(DB_KEYS.SESSION, user.id);
+      return user;
     }
+    throw new Error("Identifiants Neon invalides.");
+  },
+
+  // Fix: Added city and address to the userData type to match usage and caller data
+  register: async (userData: Partial<Member> & { city?: string; address?: string }): Promise<Member> => {
+    await wait(800);
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    
+    if (members.some(m => m.email === userData.email)) {
+      throw new Error("Cet email est déjà utilisé dans la base Neon.");
+    }
+
+    const newMember: Member = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: userData.name || 'Inconnu',
+      email: userData.email,
+      password: userData.password,
+      businessName: userData.businessName || '',
+      sector: userData.sector || 'Autre',
+      location: {
+        lat: -4.4419 + (Math.random() - 0.5) * 0.1,
+        lng: 15.2663 + (Math.random() - 0.5) * 0.1,
+        city: userData.city || 'Kinshasa',
+        address: userData.address || 'Non spécifiée'
+      },
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=random`,
+      joinedDate: new Date().toISOString(),
+      status: 'En Formation',
+      trainingProgress: 0,
+      badges: ['Nouveau'],
+      role: userData.role || 'MEMBER',
+      completedTrainings: []
+    };
+
+    const updatedMembers = [...members, newMember];
+    localStorage.setItem(DB_KEYS.MEMBERS, JSON.stringify(updatedMembers));
+    localStorage.setItem(DB_KEYS.SESSION, newMember.id);
+    
+    return newMember;
   },
 
   logout: async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.warn("Logout network error", e);
-    }
-    invalidateCache('members');
-    invalidateCache('posts');
-    invalidateCache('trainings');
-    invalidateCache('messages');
+    localStorage.removeItem(DB_KEYS.SESSION);
   },
 
-  register: async (userData: Partial<Member> & { city?: string, address?: string, password?: string }): Promise<Member> => {
-    if (!userData.email || !userData.password) throw new Error("Email et mot de passe requis");
+  // --- POSTS (CRUD) ---
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: {
-          data: {
-            name: userData.name,
-            businessName: userData.businessName
-          }
-        }
-      });
-
-      if (error) throw new Error(error.message);
-
-      if (data.user) {
-        const CITY_COORDS: {[key: string]: {lat: number, lng: number}} = {
-          'Kinshasa': { lat: -4.4419, lng: 15.2663 },
-          'Pointe-Noire': { lat: -4.7855, lng: 11.8635 },
-          'Brazzaville': { lat: -4.2634, lng: 15.2429 },
-          'Lubumbashi': { lat: -11.6609, lng: 27.4794 },
-          'Goma': { lat: -1.6585, lng: 29.2205 },
-          'Matadi': { lat: -5.8405, lng: 13.4456 }
-        };
-        const baseCoords = CITY_COORDS[userData.city || 'Kinshasa'] || CITY_COORDS['Kinshasa'];
-        const jitter = () => (Math.random() - 0.5) * 0.005;
-
-        const { error: updateError } = await supabase.from('profiles').update({
-          sector: userData.sector,
-          city: userData.city,
-          address: userData.address,
-          role: userData.role || 'MEMBER',
-          latitude: baseCoords.lat + jitter(),
-          longitude: baseCoords.lng + jitter(),
-          avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=random`
-        }).eq('id', data.user.id);
-
-        if (updateError) throw new Error(updateError.message);
-
-        invalidateCache('members');
-        
-        const user = await storageService.getCurrentUser();
-        if (!user) throw new Error("Erreur lors de la récupération du profil après création.");
-        return user;
-      }
-      throw new Error("Erreur inconnue lors de la création de l'utilisateur.");
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      throw new Error(error.message || "Erreur lors de l'inscription.");
-    }
-  },
-
-  // POSTS
-  getPosts: async (forceRefresh = false): Promise<Post[]> => {
-    if (!forceRefresh && isCacheValid('posts') && CACHE.posts.data) {
-      return CACHE.posts.data;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*, comments(count), profiles(name, avatar_url)')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw new Error(error.message);
-      
-      const posts = data.map(mapPostToApp);
-      CACHE.posts = { data: posts, timestamp: Date.now() };
-      return posts;
-    } catch (error: any) {
-      console.warn("GetPosts failed:", error.message);
-      if (CACHE.posts.data) return CACHE.posts.data;
-      return MOCK_POSTS; // Fallback only on error
-    }
+  getPosts: async (): Promise<Post[]> => {
+    await wait(300);
+    const posts: Post[] = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    
+    // Enrichissement des données (Join profiles)
+    return posts.map(p => {
+      const author = members.find(m => m.id === p.authorId);
+      return {
+        ...p,
+        authorName: author?.name || p.authorName || 'Anonyme',
+        authorAvatar: author?.avatar || p.authorAvatar || ''
+      };
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   },
 
   addPost: async (post: Post): Promise<void> => {
-    try {
-      const { error } = await supabase.from('posts').insert({
-        author_id: post.authorId,
-        content: post.content,
-        type: post.type,
-        image_url: post.image,
-        liked_by: [],
-        likes_count: 0
-      });
-      if (error) throw new Error(error.message);
-      invalidateCache('posts');
-    } catch (error: any) {
-      console.error("Add post error:", error);
-      throw new Error("Impossible de publier le post. " + error.message);
-    }
+    await wait(400);
+    const posts: Post[] = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    
+    const newPost = {
+      ...post,
+      id: 'neon_post_' + Date.now(),
+      timestamp: new Date().toISOString()
+    };
+    
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify([newPost, ...posts]));
   },
 
   deletePost: async (postId: string): Promise<void> => {
-    try {
-      const { error } = await supabase.from('posts').delete().eq('id', postId);
-      if (error) throw new Error(error.message);
-      
-      // Update cache immediately
-      if (CACHE.posts.data) {
-        CACHE.posts.data = CACHE.posts.data.filter(p => p.id !== postId);
-      } else {
-        invalidateCache('posts');
-      }
-    } catch (error: any) {
-      console.error("Delete post error:", error);
-      throw new Error("Impossible de supprimer la publication. " + error.message);
+    await wait(500);
+    const posts: Post[] = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    
+    // Suppression stricte et définitive
+    const filteredPosts = posts.filter(p => p.id !== postId);
+    
+    if (filteredPosts.length === posts.length) {
+       throw new Error("Publication introuvable dans la base de données Neon.");
+    }
+    
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify(filteredPosts));
+    
+    // Nettoyage des commentaires associés
+    const allComments = JSON.parse(localStorage.getItem(DB_KEYS.COMMENTS) || '{}');
+    if (allComments[postId]) {
+      delete allComments[postId];
+      localStorage.setItem(DB_KEYS.COMMENTS, JSON.stringify(allComments));
     }
   },
 
   updatePost: async (post: Post): Promise<void> => {
-    if (CACHE.posts.data) {
-      CACHE.posts.data = CACHE.posts.data.map(p => p.id === post.id ? post : p);
-    }
-
-    try {
-      const { error } = await supabase.from('posts').update({
-        likes_count: post.likes,
-        liked_by: post.likedBy
-      }).eq('id', post.id);
-
-      if (error) throw new Error(error.message);
-    } catch (error: any) {
-      console.error("Failed to update post:", error.message);
-      // Optimistic update stays in cache, but might revert on refresh if DB failed
-    }
+    const posts: Post[] = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    const updated = posts.map(p => p.id === post.id ? post : p);
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify(updated));
   },
 
-  // ... (Other methods follow similar pattern, kept concise for this update)
-  
-  getAllMembers: async (forceRefresh = false): Promise<Member[]> => {
-    if (!forceRefresh && isCacheValid('members') && CACHE.members.data) {
-      return CACHE.members.data;
-    }
-    try {
-      const { data, error } = await supabase.from('profiles').select('*');
-      if (error) throw error;
-      const members = data.map(mapProfileToMember);
-      CACHE.members = { data: members, timestamp: Date.now() };
-      return members;
-    } catch (e) {
-      if (CACHE.members.data) return CACHE.members.data;
-      return MOCK_MEMBERS;
-    }
+  // --- MEMBRES ---
+
+  getAllMembers: async (): Promise<Member[]> => {
+    await wait(200);
+    return JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
   },
 
-  getTrainings: async (forceRefresh = false): Promise<TrainingResource[]> => {
-    if (!forceRefresh && isCacheValid('trainings') && CACHE.trainings.data) {
-      return CACHE.trainings.data;
-    }
-    try {
-      const { data, error } = await supabase.from('trainings').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      const trainings = data.map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        type: t.type,
-        url: t.url,
-        duration: t.duration,
-        dateAdded: new Date(t.created_at).toLocaleDateString(),
-        authorName: t.author_name
-      }));
-      CACHE.trainings = { data: trainings, timestamp: Date.now() };
-      return trainings;
-    } catch (e) {
-      if (CACHE.trainings.data) return CACHE.trainings.data;
-      return MOCK_TRAININGS;
-    }
+  updateUser: async (userId: string, updates: any): Promise<Member | null> => {
+    await wait(400);
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    const updatedMembers = members.map(m => {
+      if (m.id === userId) {
+        // Gestion spéciale de la localisation si city change
+        let newLoc = { ...m.location };
+        if (updates.city && updates.city !== m.location.city) {
+          // Simulation de coordonnées par ville
+          const CITY_COORDS: any = { 'Kinshasa': [-4.44, 15.26], 'Pointe-Noire': [-4.78, 11.86] };
+          const coords = CITY_COORDS[updates.city] || [-4.26, 15.24];
+          newLoc = { ...newLoc, city: updates.city, lat: coords[0], lng: coords[1] };
+        }
+        return { ...m, ...updates, location: newLoc };
+      }
+      return m;
+    });
+    localStorage.setItem(DB_KEYS.MEMBERS, JSON.stringify(updatedMembers));
+    return updatedMembers.find(m => m.id === userId) || null;
+  },
+
+  updateUserLocation: async (userId: string, coords: any, details: any) => {
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    const updated = members.map(m => m.id === userId ? {
+      ...m,
+      location: { ...m.location, ...coords, ...details }
+    } : m);
+    localStorage.setItem(DB_KEYS.MEMBERS, JSON.stringify(updated));
+  },
+
+  // --- FORMATIONS ---
+
+  getTrainings: async (): Promise<TrainingResource[]> => {
+    return JSON.parse(localStorage.getItem(DB_KEYS.TRAININGS) || '[]');
   },
 
   addTraining: async (training: TrainingResource): Promise<void> => {
-    try {
-      const { error } = await supabase.from('trainings').insert({
-         title: training.title,
-         description: training.description,
-         type: training.type,
-         url: training.url,
-         duration: training.duration,
-         author_name: training.authorName
-      });
-      if (error) throw error;
-      invalidateCache('trainings');
-    } catch (error: any) {
-       throw new Error("Impossible d'ajouter la formation. " + error.message);
-    }
-  },
-
-  // Missing methods re-implemented with try-catch for completeness
-  updateUserLocation: async (userId: string, coords: any, details: any) => {
-      const { error } = await supabase.from('profiles').update({
-          latitude: coords.lat, longitude: coords.lng, ...details
-      }).eq('id', userId);
-      if(error) throw new Error(error.message);
-      invalidateCache('members');
-  },
-  
-  updateUser: async (userId: string, updates: any) => {
-      const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-      if(error) throw new Error(error.message);
-      invalidateCache('members');
-      return await storageService.getCurrentUser();
-  },
-
-  addComment: async (postId: string, content: string, authorId?: string) => {
-      const { error } = await supabase.from('comments').insert({ post_id: postId, author_id: authorId, content });
-      if(error) throw new Error(error.message);
-      invalidateCache('posts');
-  },
-
-  getCommentsForPost: async (postId: string) => {
-      const { data, error } = await supabase.from('comments').select('*, profiles(name)').eq('post_id', postId);
-      if(error) throw new Error(error.message);
-      return data.map((c: any) => ({
-          id: c.id, authorName: c.profiles?.name || 'Visiteur', content: c.content, timestamp: new Date(c.created_at).toLocaleTimeString()
-      }));
+    const trainings = JSON.parse(localStorage.getItem(DB_KEYS.TRAININGS) || '[]');
+    localStorage.setItem(DB_KEYS.TRAININGS, JSON.stringify([training, ...trainings]));
   },
 
   markTrainingCompleted: async (userId: string, trainingId: string) => {
-      // Logic to fetch, update array, save.
-      // Simplified for brevity as previously implemented
-      const { data: profile } = await supabase.from('profiles').select('completed_trainings').eq('id', userId).single();
-      if (profile) {
-          const current = profile.completed_trainings || [];
-          if (!current.includes(trainingId)) {
-              await supabase.from('profiles').update({ completed_trainings: [...current, trainingId] }).eq('id', userId);
-              invalidateCache('members');
-          }
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    const updated = members.map(m => {
+      if (m.id === userId) {
+        const completed = m.completedTrainings || [];
+        if (!completed.includes(trainingId)) {
+          return { ...m, completedTrainings: [...completed, trainingId] };
+        }
       }
+      return m;
+    });
+    localStorage.setItem(DB_KEYS.MEMBERS, JSON.stringify(updated));
   },
 
-  // Discussion methods
-  getCachedMessages: () => CACHE.messages.data || [],
-  syncMessageCache: (msgs: DiscussionMessage[]) => { CACHE.messages = { data: msgs, timestamp: Date.now() }; },
-  
+  // --- COMMENTAIRES ---
+
+  getCommentsForPost: async (postId: string): Promise<Comment[]> => {
+    const allComments = JSON.parse(localStorage.getItem(DB_KEYS.COMMENTS) || '{}');
+    return allComments[postId] || [];
+  },
+
+  addComment: async (postId: string, content: string, authorId: string) => {
+    const allComments = JSON.parse(localStorage.getItem(DB_KEYS.COMMENTS) || '{}');
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    const author = members.find(m => m.id === authorId);
+    
+    const newComment: Comment = {
+      id: 'comment_' + Date.now(),
+      authorName: author?.name || 'Inconnue',
+      content,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    
+    if (!allComments[postId]) allComments[postId] = [];
+    allComments[postId].push(newComment);
+    localStorage.setItem(DB_KEYS.COMMENTS, JSON.stringify(allComments));
+    
+    // Update post count
+    const posts: Post[] = JSON.parse(localStorage.getItem(DB_KEYS.POSTS) || '[]');
+    const updatedPosts = posts.map(p => p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p);
+    localStorage.setItem(DB_KEYS.POSTS, JSON.stringify(updatedPosts));
+  },
+
+  // --- DISCUSSION GÉNÉRALE (Simulée Neon) ---
+
   getDiscussionMessages: async (limit = 10, beforeTimestamp?: string) => {
-      if(!beforeTimestamp && isCacheValid('messages') && CACHE.messages.data && CACHE.messages.data.length >= limit) return CACHE.messages.data.slice(-limit);
-      let q = supabase.from('messages').select('*, profiles(name, avatar_url)').order('created_at', {ascending: false}).limit(limit);
-      if(beforeTimestamp) q = q.lt('created_at', beforeTimestamp);
-      const { data, error } = await q;
-      if(error) throw new Error(error.message);
-      const msgs = data.reverse().map((m: any) => ({
-          id: m.id, authorId: m.author_id, authorName: m.profiles?.name || 'Inconnu', 
-          authorAvatar: m.profiles?.avatar_url, content: m.content, timestamp: m.created_at, 
-          displayTime: new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-      }));
-      if(!beforeTimestamp) CACHE.messages = { data: msgs, timestamp: Date.now() };
-      return msgs;
+    await wait(200);
+    let messages: DiscussionMessage[] = JSON.parse(localStorage.getItem(DB_KEYS.MESSAGES) || '[]');
+    
+    if (beforeTimestamp) {
+      messages = messages.filter(m => new Date(m.timestamp).getTime() < new Date(beforeTimestamp).getTime());
+    }
+    
+    return messages.slice(-limit);
   },
 
-  addDiscussionMessage: async (msg: any) => {
-      const { data, error } = await supabase.from('messages').insert(msg).select('*, profiles(name, avatar_url)').single();
-      if(error) throw new Error(error.message);
-      const formatted = {
-          id: data.id, authorId: data.author_id, authorName: data.profiles?.name, authorAvatar: data.profiles?.avatar_url,
-          content: data.content, timestamp: data.created_at, displayTime: new Date(data.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-      };
-      if(CACHE.messages.data) CACHE.messages.data.push(formatted);
-      return formatted;
+  addDiscussionMessage: async (msgData: { authorId: string, content: string }) => {
+    const members: Member[] = JSON.parse(localStorage.getItem(DB_KEYS.MEMBERS) || '[]');
+    const author = members.find(m => m.id === msgData.authorId);
+    
+    const formatted: DiscussionMessage = {
+      id: 'msg_' + Date.now(),
+      authorId: msgData.authorId,
+      authorName: author?.name || 'Membre',
+      authorAvatar: author?.avatar || '',
+      content: msgData.content,
+      timestamp: new Date().toISOString(),
+      displayTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    
+    const messages = JSON.parse(localStorage.getItem(DB_KEYS.MESSAGES) || '[]');
+    localStorage.setItem(DB_KEYS.MESSAGES, JSON.stringify([...messages, formatted]));
+    return formatted;
   },
 
   deleteDiscussionMessage: async (id: string) => {
-      const { error } = await supabase.from('messages').delete().eq('id', id);
-      if(error) throw new Error(error.message);
-      if(CACHE.messages.data) CACHE.messages.data = CACHE.messages.data.filter(m => m.id !== id);
+    const messages: DiscussionMessage[] = JSON.parse(localStorage.getItem(DB_KEYS.MESSAGES) || '[]');
+    const filtered = messages.filter(m => m.id !== id);
+    localStorage.setItem(DB_KEYS.MESSAGES, JSON.stringify(filtered));
   },
 
-  // LocalStorage helpers
-  getNotifications: () => JSON.parse(localStorage.getItem('pr_notifs') || '[]'),
+  syncMessageCache: () => {}, // Inutile avec LocalStorage direct
+  getCachedMessages: () => JSON.parse(localStorage.getItem(DB_KEYS.MESSAGES) || '[]'),
+
+  // --- LOGIQUE ADMIN & LOCALSTORAGE ---
+
+  getNotifications: () => JSON.parse(localStorage.getItem(DB_KEYS.NOTIFS) || '[]'),
   addNotification: (n: Notification) => {
-     const current = JSON.parse(localStorage.getItem('pr_notifs') || '[]');
-     localStorage.setItem('pr_notifs', JSON.stringify([n, ...current]));
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.NOTIFS) || '[]');
+    localStorage.setItem(DB_KEYS.NOTIFS, JSON.stringify([n, ...current]));
   },
-  getStrategicGoals: () => JSON.parse(localStorage.getItem('pr_goals') || '[]'),
+  getStrategicGoals: () => JSON.parse(localStorage.getItem(DB_KEYS.GOALS) || '[]'),
   addStrategicGoal: (text: string) => {
-     const current = JSON.parse(localStorage.getItem('pr_goals') || '[]');
-     const newGoal = { id: Date.now().toString(), text, isCompleted: false };
-     const updated = [...current, newGoal];
-     localStorage.setItem('pr_goals', JSON.stringify(updated));
-     return updated;
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.GOALS) || '[]');
+    const updated = [...current, { id: Date.now().toString(), text, isCompleted: false }];
+    localStorage.setItem(DB_KEYS.GOALS, JSON.stringify(updated));
+    return updated;
   },
   toggleStrategicGoal: (id: string) => {
-      const current = JSON.parse(localStorage.getItem('pr_goals') || '[]');
-      const updated = current.map((g: any) => g.id === id ? {...g, isCompleted: !g.isCompleted} : g);
-      localStorage.setItem('pr_goals', JSON.stringify(updated));
-      return updated;
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.GOALS) || '[]');
+    const updated = current.map((g: any) => g.id === id ? { ...g, isCompleted: !g.isCompleted } : g);
+    localStorage.setItem(DB_KEYS.GOALS, JSON.stringify(updated));
+    return updated;
   },
   deleteStrategicGoal: (id: string) => {
-     const current = JSON.parse(localStorage.getItem('pr_goals') || '[]');
-     const updated = current.filter((g: any) => g.id !== id);
-     localStorage.setItem('pr_goals', JSON.stringify(updated));
-     return updated;
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.GOALS) || '[]');
+    const updated = current.filter((g: any) => g.id !== id);
+    localStorage.setItem(DB_KEYS.GOALS, JSON.stringify(updated));
+    return updated;
   },
-  getVictories: () => JSON.parse(localStorage.getItem('pr_victories') || '[]'),
+  getVictories: () => JSON.parse(localStorage.getItem(DB_KEYS.VICTORIES) || '[]'),
   addVictory: (v: ClusterVictory) => {
-      const current = JSON.parse(localStorage.getItem('pr_victories') || '[]');
-      const updated = [v, ...current];
-      localStorage.setItem('pr_victories', JSON.stringify(updated));
-      return updated;
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.VICTORIES) || '[]');
+    const updated = [v, ...current];
+    localStorage.setItem(DB_KEYS.VICTORIES, JSON.stringify(updated));
+    return updated;
   },
   updateVictory: (id: string, data: any) => {
-      const current = JSON.parse(localStorage.getItem('pr_victories') || '[]');
-      const updated = current.map((v: any) => v.id === id ? {...v, ...data} : v);
-      localStorage.setItem('pr_victories', JSON.stringify(updated));
-      return updated;
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.VICTORIES) || '[]');
+    const updated = current.map((v: any) => v.id === id ? { ...v, ...data } : v);
+    localStorage.setItem(DB_KEYS.VICTORIES, JSON.stringify(updated));
+    return updated;
   },
   deleteVictory: (id: string) => {
-      const current = JSON.parse(localStorage.getItem('pr_victories') || '[]');
-      const updated = current.filter((v: any) => v.id !== id);
-      localStorage.setItem('pr_victories', JSON.stringify(updated));
-      return updated;
+    const current = JSON.parse(localStorage.getItem(DB_KEYS.VICTORIES) || '[]');
+    const updated = current.filter((v: any) => v.id !== id);
+    localStorage.setItem(DB_KEYS.VICTORIES, JSON.stringify(updated));
+    return updated;
   }
 };

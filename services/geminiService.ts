@@ -1,4 +1,5 @@
-import { GoogleGenAI, Tool, Content } from "@google/genai";
+
+import { GoogleGenAI } from "@google/genai";
 
 // Base instruction defining the persona
 const BASE_SYSTEM_INSTRUCTION = `You are the AI Assistant for "PR-CONNEXION", the Cluster Congo Entreprise Développement (CGED) platform.
@@ -22,31 +23,20 @@ CONTEXT KEY:
 - "Progress": Training completion percentage.
 `;
 
-let aiClient: GoogleGenAI | null = null;
-
-export const getAiClient = (): GoogleGenAI => {
-  if (!aiClient) {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.error("API Key not found");
-      throw new Error("API Key missing");
-    }
-    aiClient = new GoogleGenAI({ apiKey });
-  }
-  return aiClient;
-};
-
+// Fix: Always create a new GoogleGenAI instance right before making an API call for best practice
 export const sendMessageToGemini = async (
   message: string,
-  history: Content[] = [],
+  history: any[] = [],
   appContext: string = ''
 ) => {
-  const ai = getAiClient();
+  // Fix: MUST use named parameter for apiKey and direct usage of process.env.API_KEY
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Using gemini-2.5-flash which supports both Google Maps and Search tools
+  // Fix: Using gemini-2.5-flash which supports both Google Maps and Search tools
+  // Note: Maps grounding is only supported in Gemini 2.5 series models.
   const modelId = "gemini-2.5-flash";
 
-  const tools: Tool[] = [
+  const tools = [
     { googleSearch: {} },
     { googleMaps: {} }
   ];
@@ -65,6 +55,7 @@ export const sendMessageToGemini = async (
       history: history
     });
 
+    // Fix: chat.sendMessage only accepts the message parameter
     const result = await chat.sendMessage({ message });
     return result;
   } catch (error) {

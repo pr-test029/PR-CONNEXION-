@@ -1,10 +1,10 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, X, Bot, MapPin, Search as SearchIcon, Loader2 } from 'lucide-react';
 import { sendMessageToGemini } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { storageService } from '../services/storageService';
 import ReactMarkdown from 'react-markdown';
-import { Content } from '@google/genai';
 
 interface AIChatProps {
   isOpen: boolean;
@@ -66,7 +66,7 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
       // 4. Posts Context (Concerns & Activities)
       const postsContext = `
       === PUBLICATIONS DU FIL D'ACTUALITÉ ===
-      Analyse ces posts pour comprendre les besoins et succès actuels :
+      Analyse ces posts pour comprendre les besoins et succès actifs :
       ${posts.slice(0, 15).map(p => {
         return `- Post de ${p.authorName} (Type: ${p.type}, ${p.timestamp}):
           Contenu : "${p.content}"
@@ -134,13 +134,14 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
       // BUILD CONTEXT RIGHT NOW (Real-time)
       const dynamicContext = await buildRealTimeContext();
 
-      // Transform internal message format to Gemini Content format
-      const history: Content[] = messages.map(m => ({
+      // Transform internal message format to Gemini history format (parts required)
+      const history = messages.map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
       }));
 
       const result = await sendMessageToGemini(userMessage.text, history, dynamicContext);
+      // Fix: Access text property directly as per guidelines (GenerateContentResponse features a text property, not a method)
       const responseText = result.text || '';
       
       const groundingMetadata = result.candidates?.[0]?.groundingMetadata;
@@ -215,15 +216,26 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
             `}>
               <ReactMarkdown>{msg.text}</ReactMarkdown>
 
-              {/* Display Grounding Sources (Search/Maps) */}
+              {/* Fix: Display Grounding Sources (Search/Maps) correctly */}
               {msg.groundingMetadata?.groundingChunks && (
                 <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1">
                   {msg.groundingMetadata.groundingChunks.map((chunk: any, idx: number) => {
+                    // Search Grounding
                     if (chunk.web?.uri) {
                        return (
                          <a key={idx} href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="flex items-center text-xs text-blue-500 hover:underline">
                            <SearchIcon className="w-3 h-3 mr-1" /> {chunk.web.title || 'Source Web'}
                          </a>
+                       );
+                    }
+                    // Maps Grounding - Required always when using googleMaps tool
+                    if (chunk.maps?.uri) {
+                       return (
+                        <div key={idx} className="space-y-1">
+                          <a href={chunk.maps.uri} target="_blank" rel="noopener noreferrer" className="flex items-center text-xs text-red-500 hover:underline">
+                            <MapPin className="w-3 h-3 mr-1" /> {chunk.maps.title || 'Voir sur Google Maps'}
+                          </a>
+                        </div>
                        );
                     }
                     return null;
