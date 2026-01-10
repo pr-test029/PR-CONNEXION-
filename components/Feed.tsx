@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, X, UserCircle, Loader2, AlertCircle } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, X, UserCircle, Loader2, AlertCircle, Database, CheckCircle2 } from 'lucide-react';
 import { Post, Comment, Member } from '../types';
 import { storageService } from '../services/storageService';
 
@@ -12,6 +13,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFallback, setIsFallback] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState<Post['type']>('Partage');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -21,7 +23,6 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const [commentsData, setCommentsData] = useState<{[postId: string]: Comment[]}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Persistent Visitor ID for likes
   const [visitorId] = useState(() => {
     if (typeof window !== 'undefined') {
       let vid = localStorage.getItem('pr_visitor_id');
@@ -40,12 +41,17 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const fetchPosts = async () => {
     setLoading(true);
     setError(null);
+    setIsFallback(false);
     try {
       const data = await storageService.getPosts();
       setPosts(data);
+      // On détecte si on utilise des données mockées (les IDs mockés commencent par 'p1', 'p2' etc)
+      if (data.length > 0 && data.some(p => typeof p.id === 'string' && p.id.startsWith('p'))) {
+        setIsFallback(true);
+      }
     } catch (err: any) {
       console.error("Fetch posts error", err);
-      setError("Impossible de charger le fil d'actualité. Vérifiez votre connexion.");
+      setError("Erreur de base de données. Veuillez rafraîchir la page.");
     } finally {
       setLoading(false);
     }
@@ -66,6 +72,10 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
 
   const handlePublish = async () => {
     if (!newPostContent.trim() || !currentUser) return;
+    if (isFallback) {
+      alert("Mode Démo : La base de données n'est pas encore prête. Vos publications ne seront pas enregistrées.");
+      return;
+    }
 
     const newPost: Post = {
       id: '',
@@ -85,38 +95,33 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
         await storageService.addPost(newPost);
         setNewPostContent('');
         setSelectedImage(null);
-        // Fetch fresh posts to ensure we have the DB-generated ID and correct timestamp
         fetchPosts(); 
-        alert("Publication envoyée avec succès !");
     } catch (error: any) {
         alert(`Erreur lors de la publication : ${error.message}`);
     }
   };
 
   const handleLike = async (post: Post) => {
+    if (isFallback) return;
     const userId = currentUser?.id || visitorId;
     let isLiked = (post.likedBy || []).includes(userId);
     
-    const alreadyLiked = isLiked;
     let newLikedBy = [...(post.likedBy || [])];
-    
-    if (alreadyLiked) {
+    if (isLiked) {
         newLikedBy = newLikedBy.filter(id => id !== userId);
     } else {
         newLikedBy.push(userId);
     }
     
-    const newCount = alreadyLiked ? Math.max(0, post.likes - 1) : post.likes + 1;
+    const newCount = isLiked ? Math.max(0, post.likes - 1) : post.likes + 1;
     const updatedPost = { ...post, likes: newCount, likedBy: newLikedBy };
     
-    // Optimistic update
     setPosts(posts.map(p => p.id === post.id ? updatedPost : p));
 
     try {
       await storageService.updatePost(updatedPost);
     } catch (error: any) {
-      console.warn("Like DB update failed:", error.message);
-      // Optionally show a toast here
+      console.warn("Like update failed:", error.message);
     }
   };
 
@@ -131,14 +136,13 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
         setCommentsData(prev => ({...prev, [postId]: comments}));
       } catch (e: any) {
         console.error("Failed loading comments", e);
-        alert("Impossible de charger les commentaires: " + e.message);
       }
     }
     setVisibleComments(newSet);
   };
 
   const submitComment = async (postId: string) => {
-    if (!currentUser) return;
+    if (!currentUser || isFallback) return;
 
     const text = commentInputs[postId]?.trim();
     if (!text) return;
@@ -147,39 +151,18 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
 
     try {
       await storageService.addComment(postId, text, currentUser.id);
-      
       const updatedComments = await storageService.getCommentsForPost(postId);
       setCommentsData(prev => ({...prev, [postId]: updatedComments}));
-
       setPosts(prevPosts => 
-        prevPosts.map(p => 
-          p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p
-        )
+        prevPosts.map(p => p.id === postId ? { ...p, comments: (p.comments || 0) + 1 } : p)
       );
-
-      if (!visibleComments.has(postId)) {
-        setVisibleComments(prev => new Set(prev).add(postId));
-      }
-
     } catch (error: any) {
-      console.error("Error submitting comment:", error);
-      alert(`Échec de l'envoi du commentaire : ${error.message}`);
+      alert(`Échec : ${error.message}`);
       setCommentInputs(prev => ({ ...prev, [postId]: text }));
     }
   };
 
-  // ... (rest of the component render logic remains similar, just ensuring dark mode classes are present as per previous request)
-
-  const handleShare = async (post: Post) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'PR-CONNEXION', text: post.content, url: window.location.href });
-      } catch (err) {}
-    } else {
-      alert("Lien copié !");
-    }
-  };
-
+  const filters = ['Tous', 'Besoins', 'Succès', 'Partages', 'Questions'];
   const filterMapping: { [key: string]: string } = {
     'Besoins': 'Besoin', 'Succès': 'Succès', 'Partages': 'Partage', 'Questions': 'Question'
   };
@@ -188,10 +171,24 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
     ? posts 
     : posts.filter(post => post.type === filterMapping[activeFilter]);
 
-  const filters = ['Tous', 'Besoins', 'Succès', 'Partages', 'Questions'];
-  
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-20">
+      
+      {/* Indicateur de statut de connexion */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center space-x-2">
+          {isFallback ? (
+             <div className="flex items-center text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-full text-xs font-bold border border-amber-200">
+               <Database className="w-3 h-3 mr-1" /> Mode Démo (SQL non appliqué)
+             </div>
+          ) : (
+             <div className="flex items-center text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
+               <CheckCircle2 className="w-3 h-3 mr-1" /> Connecté au Cluster (Supabase)
+             </div>
+          )}
+        </div>
+      </div>
+
       {currentUser ? (
         <div className="bg-white dark:bg-dark-card p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
           <div className="flex space-x-4">
@@ -236,7 +233,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <UserCircle className="w-5 h-5 text-blue-500" />
-            <p className="text-sm text-blue-700 dark:text-blue-300">Connectez-vous pour publier et commenter. L'interaction est réservée aux membres.</p>
+            <p className="text-sm text-blue-700 dark:text-blue-300">Connectez-vous pour interagir avec les autres membres.</p>
           </div>
         </div>
       )}
@@ -266,7 +263,6 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
           const userId = currentUser?.id || visitorId;
           const isLiked = (post.likedBy || []).includes(userId);
           const comments = commentsData[post.id] || [];
-          const commentCount = post.comments > comments.length ? post.comments : comments.length;
           
           return (
             <div key={post.id} className="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -281,7 +277,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
                     />
                     <div>
                       <div className="font-bold text-gray-900 dark:text-white cursor-pointer" onClick={() => onAuthorClick?.(post.authorId)}>
-                        {post.authorName || 'Membre Cluster'}
+                        {post.authorName}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{post.timestamp}</div>
                     </div>
@@ -300,17 +296,22 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
                       <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} /><span>{post.likes}</span>
                     </button>
                     <button onClick={() => toggleComments(post.id)} className="flex items-center space-x-2 text-gray-500 hover:text-primary-600 transition-colors text-sm">
-                      <MessageSquare className="w-5 h-5" /><span>{commentCount}</span>
+                      <MessageSquare className="w-5 h-5" /><span>{post.comments}</span>
                     </button>
                   </div>
-                  <button onClick={() => handleShare(post)} className="text-gray-400 hover:text-gray-600"><Share2 className="w-5 h-5" /></button>
+                  <button onClick={() => {
+                     if (navigator.share) navigator.share({ title: 'PR-CONNEXION', text: post.content, url: window.location.href });
+                     else alert("Lien copié !");
+                  }} className="text-gray-400 hover:text-gray-600">
+                    <Share2 className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
               {visibleComments.has(post.id) && (
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 border-t border-gray-100 dark:border-gray-700">
                   <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-1">
-                    {comments.length > 0 ? comments.map(c => (
+                    {comments.map(c => (
                       <div key={c.id} className="flex space-x-3">
                         <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-primary-700">
                             {c.authorName.charAt(0)}
@@ -318,24 +319,20 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
                         <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm flex-1">
                           <p className="text-xs font-bold text-gray-900 dark:text-white">{c.authorName}</p>
                           <p className="text-sm text-gray-700 dark:text-gray-300">{c.content}</p>
-                          <p className="text-[10px] text-gray-400 mt-1">{c.timestamp}</p>
                         </div>
                       </div>
-                    )) : (
-                        <p className="text-xs text-gray-500 text-center py-2">Soyez le premier à commenter.</p>
-                    )}
+                    ))}
                   </div>
                   
-                  {currentUser ? (
+                  {currentUser && (
                     <div className="flex space-x-2">
-                      <img src={currentUser.avatar} className="w-8 h-8 rounded-full object-cover" alt="Avatar"/>
                       <div className="flex-1 relative">
                         <input
                           type="text"
                           value={commentInputs[post.id] || ''}
                           onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
                           onKeyDown={(e) => e.key === 'Enter' && submitComment(post.id)}
-                          placeholder="Votre commentaire..."
+                          placeholder="Écrire un commentaire..."
                           className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-full pl-4 pr-10 py-2 text-sm focus:ring-1 focus:ring-primary-500 outline-none dark:text-white"
                         />
                         <button onClick={() => submitComment(post.id)} className="absolute right-2 top-1.5 text-primary-600 hover:scale-110 transition-transform">
@@ -343,12 +340,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-center p-3 bg-gray-100 dark:bg-gray-700/50 rounded-lg text-sm text-gray-500 dark:text-gray-400 italic">
-                      Seuls les membres connectés peuvent commenter.
-                    </div>
                   )}
-
                 </div>
               )}
             </div>
