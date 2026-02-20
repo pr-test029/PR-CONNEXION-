@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, X, UserCircle, Loader2, AlertCircle, Database, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Heart, Share2, Send, Image as ImageIcon, X, UserCircle, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Post, Comment, Member } from '../types';
 import { storageService } from '../services/storageService';
 
@@ -13,7 +13,6 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isFallback, setIsFallback] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState<Post['type']>('Partage');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -41,14 +40,9 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   const fetchPosts = async () => {
     setLoading(true);
     setError(null);
-    setIsFallback(false);
     try {
       const data = await storageService.getPosts();
       setPosts(data);
-      // On détecte si on utilise des données mockées (les IDs mockés commencent par 'p1', 'p2' etc)
-      if (data.length > 0 && data.some(p => typeof p.id === 'string' && p.id.startsWith('p'))) {
-        setIsFallback(true);
-      }
     } catch (err: any) {
       console.error("Fetch posts error", err);
       setError("Erreur de base de données. Veuillez rafraîchir la page.");
@@ -72,10 +66,6 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
 
   const handlePublish = async () => {
     if (!newPostContent.trim() || !currentUser) return;
-    if (isFallback) {
-      alert("Mode Démo : La base de données n'est pas encore prête. Vos publications ne seront pas enregistrées.");
-      return;
-    }
 
     const newPost: Post = {
       id: '',
@@ -102,7 +92,6 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   };
 
   const handleLike = async (post: Post) => {
-    if (isFallback) return;
     const userId = currentUser?.id || visitorId;
     let isLiked = (post.likedBy || []).includes(userId);
     
@@ -142,7 +131,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   };
 
   const submitComment = async (postId: string) => {
-    if (!currentUser || isFallback) return;
+    if (!currentUser) return;
 
     const text = commentInputs[postId]?.trim();
     if (!text) return;
@@ -177,15 +166,9 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
       {/* Indicateur de statut de connexion */}
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center space-x-2">
-          {isFallback ? (
-             <div className="flex items-center text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-full text-xs font-bold border border-amber-200">
-               <Database className="w-3 h-3 mr-1" /> Mode Démo (SQL non appliqué)
-             </div>
-          ) : (
-             <div className="flex items-center text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
-               <CheckCircle2 className="w-3 h-3 mr-1" /> Connecté au Cluster (Supabase)
-             </div>
-          )}
+          <div className="flex items-center text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-full text-xs font-bold border border-green-200">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> Connecté au Cluster (SQLite)
+          </div>
         </div>
       </div>
 

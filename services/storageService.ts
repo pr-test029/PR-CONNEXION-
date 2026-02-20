@@ -110,22 +110,31 @@ export const storageService = {
 
   // --- POSTS ---
   getPosts: async (): Promise<Post[]> => {
-    return getLocal<Post[]>(KEYS.POSTS, MOCK_POSTS);
+    const response = await fetch('/api/posts');
+    if (!response.ok) return [];
+    return await response.json();
   },
 
   addPost: async (post: Post): Promise<void> => {
-    const posts = getLocal<Post[]>(KEYS.POSTS, MOCK_POSTS);
-    setLocal(KEYS.POSTS, [post, ...posts]);
+    await fetch('/api/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(post),
+    });
   },
 
   deletePost: async (postId: string): Promise<void> => {
+    // Not implemented in server yet, but we can keep it as mock or add it
     const posts = getLocal<Post[]>(KEYS.POSTS, MOCK_POSTS);
     setLocal(KEYS.POSTS, posts.filter(p => p.id !== postId));
   },
 
   updatePost: async (post: Post): Promise<void> => {
-    const posts = getLocal<Post[]>(KEYS.POSTS, MOCK_POSTS);
-    setLocal(KEYS.POSTS, posts.map(p => p.id === post.id ? post : p));
+    await fetch(`/api/posts/${post.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ likes: post.likes, likedBy: post.likedBy }),
+    });
   },
 
   // --- MEMBRES ---
@@ -192,25 +201,17 @@ export const storageService = {
 
   // --- COMMENTAIRES ---
   getCommentsForPost: async (postId: string): Promise<Comment[]> => {
-    const allComments = getLocal<Record<string, Comment[]>>(KEYS.COMMENTS, {});
-    return allComments[postId] || [];
+    const response = await fetch(`/api/posts/${postId}/comments`);
+    if (!response.ok) return [];
+    return await response.json();
   },
 
   addComment: async (postId: string, content: string, authorId: string) => {
-    const allComments = getLocal<Record<string, Comment[]>>(KEYS.COMMENTS, {});
-    const members = getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
-    const author = members.find(m => m.id === authorId);
-    
-    const newComment: Comment = {
-      id: Math.random().toString(36).substr(2, 9),
-      authorName: author?.name || 'Membre',
-      content,
-      timestamp: new Date().toLocaleTimeString()
-    };
-    
-    if (!allComments[postId]) allComments[postId] = [];
-    allComments[postId].push(newComment);
-    setLocal(KEYS.COMMENTS, allComments);
+    await fetch(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authorId, content }),
+    });
   },
 
   // --- DISCUSSION GÉNÉRALE ---

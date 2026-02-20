@@ -33,10 +33,33 @@ db.exec(`
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS posts (
+    id TEXT PRIMARY KEY,
+    author_id TEXT,
+    content TEXT,
+    type TEXT,
+    likes INTEGER DEFAULT 0,
+    comments_count INTEGER DEFAULT 0,
+    image TEXT,
+    liked_by TEXT, -- JSON array of user IDs
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(author_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY,
+    post_id TEXT,
+    author_id TEXT,
+    content TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(post_id) REFERENCES posts(id),
+    FOREIGN KEY(author_id) REFERENCES users(id)
+  );
 `);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -119,6 +142,85 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
     console.error('OAuth error:', error);
     res.status(500).send('Authentication failed');
   }
+});
+
+// Posts API
+app.get('/api/posts', (req, res) => {
+  const posts = db.prepare(`
+    SELECT p.*, u.name as authorName, u.avatar as authorAvatar
+    FROM posts p
+    JOIN users u ON p.author_id = u.id
+    ORDER BY p.timestamp DESC
+  `).all();
+  
+  const formattedPosts = posts.map((p: any) => ({
+    ...p,
+    likedBy: p.liked_by ? JSON.parse(p.liked_by) : [],
+    comments: p.comments_count
+  }));
+  
+  res.json(formattedPosts);
+});
+
+app.post('/api/posts', (req, res) => {
+  const { authorId, content, type, image } = req.body;
+  const id = Math.random().toString(36).substring(2, 15);
+  
+  const insert = db.prepare(`
+    INSERT INTO posts (id, author_id, content, type, image, liked_by)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  insert.run(id, authorId, content, type, image || null, JSON.stringify([]));
+  
+  res.json({ id });
+});
+
+app.put('/api/posts/:id', (req, res) => {
+  const { id } = req.params;
+  const { likes, likedBy } = req.body;
+  
+  const update = db.prepare(`
+    UPDATE posts SET likes = ?, liked_by = ? WHERE id = ?
+  `);
+  update.run(likes, JSON.stringify(likedBy), id);
+  
+  res.json({ success: true });
+});
+
+// Comments API
+app.get('/api/posts/:postId/comments', (req, res) => {
+  const { postId } = req.params;
+  const comments = db.prepare(`
+    SELECT c.*, u.name as authorName, u.avatar as authorAvatar
+    FROM comments c
+    JOIN users u ON c.author_id = u.id
+    WHERE c.post_id = ?
+    ORDER BY c.timestamp ASC
+  `).all(postId);
+  res.json(comments);
+});
+
+app.post('/api/posts/:postId/comments', (req, res) => {
+  const { postId } = req.params;
+  const { authorId, content } = req.body;
+  const id = Math.random().toString(36).substring(2, 15);
+  
+  const insert = db.prepare(`
+    INSERT INTO comments (id, post_id, author_id, content)
+    VALUES (?, ?, ?, ?)
+  `);
+  
+  const updateCount = db.prepare(`
+    UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?
+  `);
+  
+  const transaction = db.transaction(() => {
+    insert.run(id, postId, authorId, content);
+    updateCount.run(postId);
+  });
+  
+  transaction();
+  res.json({ id });
 });
 
 // Scores API
