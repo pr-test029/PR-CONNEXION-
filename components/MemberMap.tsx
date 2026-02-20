@@ -164,34 +164,9 @@ export const MemberMap: React.FC<MemberMapProps> = ({ currentUser }) => {
         const { latitude, longitude } = position.coords;
         
         try {
-          // 1. Reverse Geocoding: Fetch readable address from coordinates
-          // Using OpenStreetMap Nominatim API (free) to get city and road
-          let detectedCity = currentUser.location.city;
-          let detectedAddress = currentUser.location.address;
-
-          try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
-              headers: {
-                'User-Agent': 'cluster-App/1.0'
-              }
-            });
-            const data = await response.json();
-            
-            if (data && data.address) {
-              // Extract City: Nominatim returns variable fields for "city" depending on location type
-              detectedCity = data.address.city || data.address.town || data.address.village || data.address.municipality || detectedCity;
-              
-              // Extract Address: Use road name or display name parts
-              const road = data.address.road || data.address.pedestrian;
-              if (road) {
-                detectedAddress = road;
-              } else if (data.display_name) {
-                detectedAddress = data.display_name.split(',')[0];
-              }
-            }
-          } catch (geoError) {
-            console.warn("Reverse geocoding failed, using coords only", geoError);
-          }
+          // 1. Mock Geocoding: Use current city/address or generic values
+          let detectedCity = currentUser.location.city || 'Kinshasa';
+          let detectedAddress = currentUser.location.address || 'Position GPS';
 
           // 2. Update DB with new Coordinates AND new Address details
           await storageService.updateUserLocation(
@@ -339,7 +314,7 @@ export const MemberMap: React.FC<MemberMapProps> = ({ currentUser }) => {
             </div>
             <button 
               className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2 text-sm font-medium shadow-md ml-2 shrink-0"
-              onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${selectedMember.location.lat},${selectedMember.location.lng}`, '_blank')}
+              onClick={() => alert(`Itinéraire vers ${selectedMember.businessName} (${selectedMember.location.lat}, ${selectedMember.location.lng})`)}
             >
               <Navigation className="w-4 h-4" />
               <span className="hidden sm:inline">Itinéraire</span>

@@ -5,21 +5,19 @@ import { MemberMap } from './components/MemberMap';
 import { Profile } from './components/Profile';
 import { Training } from './components/Training';
 import { Dashboard } from './components/Dashboard';
-import { AIChat } from './components/AIChat';
 import { Auth } from './components/Auth';
 import { AdminPanel } from './components/AdminPanel';
 import { Notifications } from './components/Notifications';
 import { GeneralDiscussion } from './components/GeneralDiscussion';
 import { Settings } from './components/Settings';
 import { AppView, Member, Notification } from './types';
-import { Menu, Bell, Sparkles, LogIn, Loader2 } from 'lucide-react';
+import { Menu, Bell, LogIn, Loader2 } from 'lucide-react';
 import { CLUSTER_INFO } from './constants';
 import { storageService } from './services/storageService';
 
 const App: React.FC = () => {
   const [currentView, setView] = useState<AppView>(AppView.FEED);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Member | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,16 +212,6 @@ const App: React.FC = () => {
            </div>
         </main>
       </div>
-
-      {!isChatOpen && (
-        <button
-          onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-28 right-6 bg-gradient-to-r from-primary-600 to-primary-500 text-white p-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 z-40 group"
-        >
-          <Sparkles className="w-6 h-6 group-hover:animate-pulse" />
-        </button>
-      )}
-      <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 };

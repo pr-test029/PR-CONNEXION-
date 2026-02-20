@@ -8,7 +8,7 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
-  const AGENCY_LOGO_URL = "https://aaeqzcffwehqajriwrqs.supabase.co/storage/v1/object/sign/Bibliotheque%20d'image%20perso/PR-LG-PNG.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iYmRhMWFlYS0xMTNlLTQ5NDUtOWFlYy1kNWMyMzY3YmY1YTUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJCaWJsaW90aGVxdWUgZCdpbWFnZSBwZXJzby9QUi1MRy1QTkcucG5nIiwiaWF0IjoxNzY4MDA0Njc3LCJleHAiOjE4OTQxNDg2Nzd9.C39GaUJa35o3BI0jHJTBBMEraYuj5x8Oc1lAy_nTlzw";
+  const AGENCY_LOGO_URL = "https://ui-avatars.com/api/?name=Powerful+Reach&background=000000&color=ffffff&size=128&bold=true";
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">

@@ -1,8 +1,7 @@
 {
-  "name": "cluster",
-  "description": "Réseau social professionnel pour les femmes entrepreneures du Cluster Congo Entreprise Développement. Plateforme d'échange, de suivi de parcours et de localisation.",
+  "name": "Cluster Pro",
+  "description": "Plateforme d'excellence féminine avec authentification Google et suivi des scores.",
   "requestFramePermissions": [
-    "geolocation",
-    "microphone"
+    "geolocation"
   ]
 }

@@ -24,7 +24,8 @@ import {
   X,
   ShieldCheck,
   Camera,
-  Upload
+  Upload,
+  Zap
 } from 'lucide-react';
 
 interface ProfileProps {
@@ -141,6 +142,16 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
     }
   };
 
+  const handleEarnPoints = async () => {
+    if (!user) return;
+    try {
+      await storageService.addScore(user.id, 10, 'activity');
+      alert('Bravo ! Vous avez gagné 10 points.');
+    } catch (error) {
+      console.error('Failed to add score', error);
+    }
+  };
+
   // Map status based on user data
   const completedIds = user?.completedTrainings || [];
   
@@ -231,6 +242,14 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
               <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold rounded uppercase flex items-center">
                 <CheckCircle className="w-3 h-3 mr-1" /> {user.status}
               </span>
+              {isOwnProfile && (
+                <button 
+                  onClick={handleEarnPoints}
+                  className="px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 text-xs font-bold rounded uppercase flex items-center hover:bg-primary-200 transition-colors"
+                >
+                  <Zap className="w-3 h-3 mr-1" /> Gagner des points
+                </button>
+              )}
             </div>
           </div>
           <div className="flex space-x-3 pb-2">

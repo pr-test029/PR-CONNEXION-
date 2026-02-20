@@ -2,10 +2,11 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { Users, Award, TrendingUp, MessageCircle, Target, Calendar, ArrowUpRight, Zap } from 'lucide-react';
+import { Users, Award, TrendingUp, MessageCircle, Target, Calendar, ArrowUpRight, Zap, Trophy } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { CLUSTER_INFO } from '../constants';
 import { StrategicGoal, Member, Post } from '../types';
+import { Leaderboard } from './Leaderboard';
 
 export const Dashboard: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -203,14 +204,11 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom Section: Roadmap Only (Victories Removed) */}
+      {/* Bottom Section: Roadmap & Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <div className="lg:col-span-2 hidden lg:block">
-           {/* Placeholder for layout balance or future content */}
-           <div className="h-full bg-gray-50 dark:bg-gray-900/50 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl flex items-center justify-center p-6 text-gray-400 text-sm">
-             Espace réservé pour futures analyses (Flux financier, etc.)
-           </div>
+        <div className="lg:col-span-2">
+           <Leaderboard />
         </div>
 
         {/* Roadmap / Goals */}
