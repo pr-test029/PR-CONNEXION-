@@ -300,7 +300,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
                     </button>
                   </div>
                   <button onClick={() => {
-                     if (navigator.share) navigator.share({ title: 'PR-CONNEXION', text: post.content, url: window.location.href });
+                     if (navigator.share) navigator.share({ title: 'cluster', text: post.content, url: window.location.href });
                      else alert("Lien copié !");
                   }} className="text-gray-400 hover:text-gray-600">
                     <Share2 className="w-5 h-5" />

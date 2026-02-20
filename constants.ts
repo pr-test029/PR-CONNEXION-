@@ -115,7 +115,7 @@ export const MOCK_TRAININGS: TrainingResource[] = [
     url: 'https://www.w3schools.com/html/horse.mp3', // Sample audio
     duration: '18 min',
     dateAdded: '20 Jan 2025',
-    authorName: 'PR-CONNEXION'
+    authorName: 'cluster'
   },
   {
     id: 't4',

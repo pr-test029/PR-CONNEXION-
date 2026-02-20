@@ -101,7 +101,7 @@ export const Settings: React.FC<SettingsProps> = ({ theme, toggleTheme }) => {
         </div>
         <div className="p-6">
           <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
-            La plateforme <strong className="text-primary-600">PR-CONNEXION</strong> a été créée pour répondre aux besoins spécifiques du 
+            La plateforme <strong className="text-primary-600">cluster</strong> a été créée pour répondre aux besoins spécifiques du 
             Cluster Congo Entreprise Développement. Notre mission est de fournir un espace numérique sécurisé et professionnel 
             permettant aux femmes entrepreneures de se connecter, de se former et de croître ensemble.
           </p>

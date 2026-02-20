@@ -91,7 +91,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin, onCancel }) => {
              <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm">
                 <Sparkles className="w-8 h-8 text-primary-400" />
              </div>
-             <h1 className="text-4xl font-bold tracking-tight">PR-CONNEXION</h1>
+             <h1 className="text-4xl font-bold tracking-tight uppercase">cluster</h1>
           </div>
           
           <h2 className="text-2xl font-light mb-8 text-gray-200">

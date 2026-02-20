@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         lg:translate-x-0 lg:static
       `}>
         <div className="h-16 flex items-center justify-center border-b border-primary-100 dark:border-gray-800 bg-primary-50 dark:bg-gray-900">
-          <h1 className="text-xl font-bold text-primary-600 tracking-wider">PR-CONNEXION</h1>
+          <h1 className="text-xl font-bold text-primary-600 tracking-wider uppercase">cluster</h1>
         </div>
 
         <div className="p-4 overflow-y-auto h-[calc(100vh-4rem)] flex flex-col justify-between">
