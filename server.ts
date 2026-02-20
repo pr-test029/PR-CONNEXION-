@@ -22,59 +22,7 @@ db.exec(`
     name TEXT,
     email TEXT UNIQUE,
     avatar TEXT,
-    business_name TEXT,
-    sector TEXT,
-    city TEXT,
-    address TEXT,
-    lat REAL,
-    lng REAL,
-    role TEXT DEFAULT 'MEMBER',
-    joined_date TEXT,
-    status TEXT DEFAULT 'En Formation',
-    training_progress INTEGER DEFAULT 0,
-    badges TEXT, -- JSON array
-    completed_trainings TEXT -- JSON array
-  );
-
-  CREATE TABLE IF NOT EXISTS trainings (
-    id TEXT PRIMARY KEY,
-    title TEXT,
-    description TEXT,
-    type TEXT,
-    url TEXT,
-    date_added TEXT,
-    author_name TEXT,
-    duration TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS discussion_messages (
-    id TEXT PRIMARY KEY,
-    author_id TEXT,
-    content TEXT,
-    timestamp TEXT,
-    display_time TEXT,
-    FOREIGN KEY(author_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS notifications (
-    id TEXT PRIMARY KEY,
-    title TEXT,
-    message TEXT,
-    date TEXT,
-    author_name TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS strategic_goals (
-    id TEXT PRIMARY KEY,
-    text TEXT,
-    is_completed INTEGER DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS victories (
-    id TEXT PRIMARY KEY,
-    title TEXT,
-    description TEXT,
-    date TEXT
+    role TEXT DEFAULT 'MEMBER'
   );
 
   CREATE TABLE IF NOT EXISTS scores (
@@ -164,21 +112,13 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
 
     // Save or update user in DB
     const upsertUser = db.prepare(`
-      INSERT INTO users (id, name, email, avatar, joined_date, badges, completed_trainings)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, name, email, avatar)
+      VALUES (?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         avatar = excluded.avatar
     `);
-    upsertUser.run(
-      userData.id, 
-      userData.name, 
-      userData.email, 
-      userData.picture, 
-      new Date().toLocaleDateString(),
-      JSON.stringify(['Nouvelle']),
-      JSON.stringify([])
-    );
+    upsertUser.run(userData.id, userData.name, userData.email, userData.picture);
 
     res.send(`
       <html>
@@ -202,176 +142,6 @@ app.get(['/auth/callback', '/auth/callback/'], async (req, res) => {
     console.error('OAuth error:', error);
     res.status(500).send('Authentication failed');
   }
-});
-
-// Members API
-app.get('/api/members', (req, res) => {
-  const members = db.prepare('SELECT * FROM users').all();
-  const formatted = members.map((m: any) => ({
-    ...m,
-    businessName: m.business_name,
-    joinedDate: m.joined_date,
-    trainingProgress: m.training_progress,
-    location: {
-      lat: m.lat,
-      lng: m.lng,
-      city: m.city,
-      address: m.address
-    },
-    badges: m.badges ? JSON.parse(m.badges) : [],
-    completedTrainings: m.completed_trainings ? JSON.parse(m.completed_trainings) : []
-  }));
-  res.json(formatted);
-});
-
-app.post('/api/members', (req, res) => {
-  const { id, name, email, businessName, sector, city, address, lat, lng, role } = req.body;
-  const insert = db.prepare(`
-    INSERT INTO users (id, name, email, avatar, business_name, sector, city, address, lat, lng, role, joined_date, badges, completed_trainings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
-  insert.run(
-    id, name, email, avatar, businessName, sector, city, address, lat, lng, role, 
-    new Date().toLocaleDateString(), 
-    JSON.stringify(['Nouvelle']), 
-    JSON.stringify([])
-  );
-  res.json({ success: true });
-});
-
-app.put('/api/members/:id', (req, res) => {
-  const { id } = req.params;
-  const updates = req.body;
-  
-  const fields = [];
-  const values = [];
-  
-  if (updates.name) { fields.push('name = ?'); values.push(updates.name); }
-  if (updates.businessName) { fields.push('business_name = ?'); values.push(updates.businessName); }
-  if (updates.sector) { fields.push('sector = ?'); values.push(updates.sector); }
-  if (updates.city) { fields.push('city = ?'); values.push(updates.city); }
-  if (updates.address) { fields.push('address = ?'); values.push(updates.address); }
-  if (updates.location) {
-    fields.push('lat = ?'); values.push(updates.location.lat);
-    fields.push('lng = ?'); values.push(updates.location.lng);
-    if (updates.location.city) { fields.push('city = ?'); values.push(updates.location.city); }
-    if (updates.location.address) { fields.push('address = ?'); values.push(updates.location.address); }
-  }
-  if (updates.completedTrainings) { fields.push('completed_trainings = ?'); values.push(JSON.stringify(updates.completedTrainings)); }
-  
-  if (fields.length === 0) return res.json({ success: true });
-  
-  values.push(id);
-  const update = db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`);
-  update.run(...values);
-  res.json({ success: true });
-});
-
-// Trainings API
-app.get('/api/trainings', (req, res) => {
-  const trainings = db.prepare('SELECT * FROM trainings ORDER BY date_added DESC').all();
-  res.json(trainings);
-});
-
-app.post('/api/trainings', (req, res) => {
-  const t = req.body;
-  const insert = db.prepare(`
-    INSERT INTO trainings (id, title, description, type, url, date_added, author_name, duration)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insert.run(t.id, t.title, t.description, t.type, t.url, t.dateAdded, t.authorName, t.duration);
-  res.json({ success: true });
-});
-
-// Discussion API
-app.get('/api/discussion', (req, res) => {
-  const messages = db.prepare(`
-    SELECT m.*, u.name as authorName, u.avatar as authorAvatar
-    FROM discussion_messages m
-    JOIN users u ON m.author_id = u.id
-    ORDER BY m.timestamp ASC
-  `).all();
-  res.json(messages);
-});
-
-app.post('/api/discussion', (req, res) => {
-  const { id, authorId, content, timestamp, displayTime } = req.body;
-  const insert = db.prepare(`
-    INSERT INTO discussion_messages (id, author_id, content, timestamp, display_time)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-  insert.run(id, authorId, content, timestamp, displayTime);
-  res.json({ success: true });
-});
-
-app.delete('/api/discussion/:id', (req, res) => {
-  db.prepare('DELETE FROM discussion_messages WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
-});
-
-// Notifications API
-app.get('/api/notifications', (req, res) => {
-  const notifs = db.prepare('SELECT * FROM notifications ORDER BY date DESC').all();
-  res.json(notifs);
-});
-
-app.post('/api/notifications', (req, res) => {
-  const n = req.body;
-  const insert = db.prepare(`
-    INSERT INTO notifications (id, title, message, date, author_name)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-  insert.run(n.id, n.title, n.message, n.date, n.authorName);
-  res.json({ success: true });
-});
-
-// Goals API
-app.get('/api/goals', (req, res) => {
-  const goals = db.prepare('SELECT * FROM strategic_goals').all();
-  res.json(goals.map((g: any) => ({ ...g, isCompleted: !!g.is_completed })));
-});
-
-app.post('/api/goals', (req, res) => {
-  const { id, text } = req.body;
-  db.prepare('INSERT INTO strategic_goals (id, text) VALUES (?, ?)').run(id, text);
-  res.json({ success: true });
-});
-
-app.put('/api/goals/:id', (req, res) => {
-  const { id } = req.params;
-  const { isCompleted } = req.body;
-  db.prepare('UPDATE strategic_goals SET is_completed = ? WHERE id = ?').run(isCompleted ? 1 : 0, id);
-  res.json({ success: true });
-});
-
-app.delete('/api/goals/:id', (req, res) => {
-  db.prepare('DELETE FROM strategic_goals WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
-});
-
-// Victories API
-app.get('/api/victories', (req, res) => {
-  const victories = db.prepare('SELECT * FROM victories ORDER BY date DESC').all();
-  res.json(victories);
-});
-
-app.post('/api/victories', (req, res) => {
-  const v = req.body;
-  db.prepare('INSERT INTO victories (id, title, description, date) VALUES (?, ?, ?, ?)').run(v.id, v.title, v.description, v.date);
-  res.json({ success: true });
-});
-
-app.put('/api/victories/:id', (req, res) => {
-  const { id } = req.params;
-  const { title, description } = req.body;
-  db.prepare('UPDATE victories SET title = ?, description = ? WHERE id = ?').run(title, description, id);
-  res.json({ success: true });
-});
-
-app.delete('/api/victories/:id', (req, res) => {
-  db.prepare('DELETE FROM victories WHERE id = ?').run(req.params.id);
-  res.json({ success: true });
 });
 
 // Posts API

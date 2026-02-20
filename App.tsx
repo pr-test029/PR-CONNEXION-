@@ -36,8 +36,7 @@ const App: React.FC = () => {
       try {
         const user = await storageService.getCurrentUser();
         setCurrentUser(user);
-        const notifs = await storageService.getNotifications();
-        setNotifications(notifs);
+        setNotifications(storageService.getNotifications());
       } catch (e) {
         console.error("Init error", e);
       } finally {

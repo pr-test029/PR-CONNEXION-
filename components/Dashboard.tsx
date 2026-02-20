@@ -14,13 +14,12 @@ export const Dashboard: React.FC = () => {
   const [goals, setGoals] = useState<StrategicGoal[]>([]);
 
   useEffect(() => {
-    const loadData = async () => {
+    const fetchData = async () => {
       setMembers(await storageService.getAllMembers());
       setPosts(await storageService.getPosts());
-      const goalsData = await storageService.getStrategicGoals();
-      setGoals(goalsData);
+      setGoals(storageService.getStrategicGoals());
     };
-    loadData();
+    fetchData();
   }, []);
 
   // --- CALCULATION OF REAL METRICS ---

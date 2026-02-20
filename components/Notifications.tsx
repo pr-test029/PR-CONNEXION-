@@ -8,8 +8,8 @@ export const Notifications: React.FC = () => {
   const [victories, setVictories] = useState<ClusterVictory[]>([]);
 
   useEffect(() => {
-    storageService.getNotifications().then(setNotifications);
-    storageService.getVictories().then(setVictories);
+    setNotifications(storageService.getNotifications());
+    setVictories(storageService.getVictories());
   }, []);
 
   return (

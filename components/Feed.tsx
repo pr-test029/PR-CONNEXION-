@@ -37,7 +37,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
     return 'unknown_visitor';
   });
 
-  const loadPosts = async () => {
+  const fetchPosts = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -52,7 +52,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
   };
   
   useEffect(() => {
-    loadPosts();
+    fetchPosts();
   }, []);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +85,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
         await storageService.addPost(newPost);
         setNewPostContent('');
         setSelectedImage(null);
-        loadPosts(); 
+        fetchPosts(); 
     } catch (error: any) {
         alert(`Erreur lors de la publication : ${error.message}`);
     }
@@ -235,7 +235,7 @@ export const Feed: React.FC<FeedProps> = ({ onAuthorClick, currentUser }) => {
         <div className="flex flex-col items-center justify-center py-12 text-center">
             <AlertCircle className="w-10 h-10 text-red-400 mb-3" />
             <p className="text-gray-800 dark:text-white font-medium">{error}</p>
-            <button onClick={loadPosts} className="mt-4 text-primary-600 hover:underline text-sm">Réessayer</button>
+            <button onClick={fetchPosts} className="mt-4 text-primary-600 hover:underline text-sm">Réessayer</button>
         </div>
       ) : filteredPosts.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-dark-card rounded-xl border border-dashed border-gray-200 dark:border-gray-700">

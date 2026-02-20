@@ -23,7 +23,7 @@ export const MemberMap: React.FC<MemberMapProps> = ({ currentUser }) => {
 
   // Fetch real members on mount
   useEffect(() => {
-    const loadMembers = async () => {
+    const fetchMembers = async () => {
       try {
         const members = await storageService.getAllMembers();
         if (Array.isArray(members)) {
@@ -36,7 +36,7 @@ export const MemberMap: React.FC<MemberMapProps> = ({ currentUser }) => {
         setAllMembers([]);
       }
     };
-    loadMembers();
+    fetchMembers();
   }, []);
 
   // Filter members based on search
