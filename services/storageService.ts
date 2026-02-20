@@ -53,12 +53,19 @@ export const storageService = {
   getCurrentUser: async (): Promise<Member | null> => {
     const googleUser = localStorage.getItem('google_user');
     if (googleUser) return JSON.parse(googleUser);
-    return getLocal<Member | null>(KEYS.USER, null);
+    
+    const localUser = localStorage.getItem(KEYS.USER);
+    if (localUser) {
+      const user = JSON.parse(localUser);
+      // Refresh from DB
+      const members = await storageService.getAllMembers();
+      return members.find(m => m.id === user.id) || user;
+    }
+    return null;
   },
 
   login: async (email: string, password: string): Promise<Member | null> => {
-    // Simple mock login: find in mock members or local members
-    const members = getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
+    const members = await storageService.getAllMembers();
     const user = members.find(m => m.email === email);
     if (user) {
       setLocal(KEYS.USER, user);
@@ -68,8 +75,7 @@ export const storageService = {
   },
 
   register: async (userData: Partial<Member> & { city?: string; address?: string; password?: string }): Promise<Member> => {
-    const members = getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
-    
+    const id = Math.random().toString(36).substr(2, 9);
     const CITY_COORDS: { [key: string]: { lat: number, lng: number } } = {
       'Kinshasa': { lat: -4.4419, lng: 15.2663 },
       'Pointe-Noire': { lat: -4.7855, lng: 11.8635 },
@@ -77,8 +83,8 @@ export const storageService = {
     };
     const baseCoords = CITY_COORDS[userData.city || 'Kinshasa'] || CITY_COORDS['Kinshasa'];
 
-    const newUser: Member = {
-      id: Math.random().toString(36).substr(2, 9),
+    const newUser: Partial<Member> = {
+      id,
       name: userData.name || 'Utilisatrice',
       email: userData.email || '',
       businessName: userData.businessName || '',
@@ -89,18 +95,19 @@ export const storageService = {
         address: userData.address || '', 
         city: userData.city || 'Kinshasa' 
       },
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=random`,
-      joinedDate: new Date().toLocaleDateString(),
-      status: 'En Formation',
-      trainingProgress: 0,
-      badges: ['Nouvelle'],
-      role: userData.role || 'MEMBER',
-      completedTrainings: []
+      role: userData.role || 'MEMBER'
     };
     
-    setLocal(KEYS.MEMBERS, [newUser, ...members]);
-    setLocal(KEYS.USER, newUser);
-    return newUser;
+    await fetch('/api/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newUser),
+    });
+
+    const members = await storageService.getAllMembers();
+    const created = members.find(m => m.id === id)!;
+    setLocal(KEYS.USER, created);
+    return created;
   },
 
   logout: async () => {
@@ -139,21 +146,26 @@ export const storageService = {
 
   // --- MEMBRES ---
   getAllMembers: async (): Promise<Member[]> => {
-    return getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
+    const response = await fetch('/api/members');
+    if (!response.ok) return [];
+    return await response.json();
   },
 
   updateUser: async (userId: string, updates: any): Promise<Member | null> => {
-    const members = getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
-    const updatedMembers = members.map(m => m.id === userId ? { ...m, ...updates } : m);
-    setLocal(KEYS.MEMBERS, updatedMembers);
+    await fetch(`/api/members/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    
+    const members = await storageService.getAllMembers();
+    const updatedUser = members.find(m => m.id === userId) || null;
     
     const currentUser = await storageService.getCurrentUser();
-    if (currentUser?.id === userId) {
-      const updatedUser = { ...currentUser, ...updates };
+    if (currentUser?.id === userId && updatedUser) {
       setLocal(KEYS.USER, updatedUser);
-      return updatedUser;
     }
-    return null;
+    return updatedUser;
   },
 
   updateUserLocation: async (userId: string, coords: any, details: any) => {
@@ -169,32 +181,26 @@ export const storageService = {
 
   // --- FORMATIONS ---
   getTrainings: async (): Promise<TrainingResource[]> => {
-    return getLocal<TrainingResource[]>(KEYS.TRAININGS, MOCK_TRAININGS);
+    const response = await fetch('/api/trainings');
+    if (!response.ok) return [];
+    return await response.json();
   },
 
   addTraining: async (training: TrainingResource): Promise<void> => {
-    const trainings = getLocal<TrainingResource[]>(KEYS.TRAININGS, MOCK_TRAININGS);
-    setLocal(KEYS.TRAININGS, [training, ...trainings]);
+    await fetch('/api/trainings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(training),
+    });
   },
 
   markTrainingCompleted: async (userId: string, trainingId: string) => {
-    const members = getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
-    const updatedMembers = members.map(m => {
-      if (m.id === userId) {
-        const completed = m.completedTrainings || [];
-        if (!completed.includes(trainingId)) {
-          return { ...m, completedTrainings: [...completed, trainingId] };
-        }
-      }
-      return m;
-    });
-    setLocal(KEYS.MEMBERS, updatedMembers);
-    
     const currentUser = await storageService.getCurrentUser();
     if (currentUser?.id === userId) {
       const completed = currentUser.completedTrainings || [];
       if (!completed.includes(trainingId)) {
-        setLocal(KEYS.USER, { ...currentUser, completedTrainings: [...completed, trainingId] });
+        const newCompleted = [...completed, trainingId];
+        await storageService.updateUser(userId, { completedTrainings: newCompleted });
       }
     }
   },
@@ -216,77 +222,98 @@ export const storageService = {
 
   // --- DISCUSSION GÉNÉRALE ---
   getDiscussionMessages: async (limit = 15, beforeTimestamp?: string) => {
-    const messages = getLocal<DiscussionMessage[]>(KEYS.MESSAGES, []);
-    // Simple mock: return last N messages
+    const response = await fetch('/api/discussion');
+    if (!response.ok) return [];
+    const messages = await response.json();
     return messages.slice(-limit);
   },
 
   addDiscussionMessage: async (msgData: { authorId: string, content: string }) => {
-    const messages = getLocal<DiscussionMessage[]>(KEYS.MESSAGES, []);
-    const members = getLocal<Member[]>(KEYS.MEMBERS, MOCK_MEMBERS);
-    const author = members.find(m => m.id === msgData.authorId);
-    
-    const newMessage: DiscussionMessage = {
-      id: Math.random().toString(36).substr(2, 9),
+    const id = Math.random().toString(36).substr(2, 9);
+    const newMessage = {
+      id,
       authorId: msgData.authorId,
-      authorName: author?.name || 'Membre',
-      authorAvatar: author?.avatar || '',
       content: msgData.content,
       timestamp: new Date().toISOString(),
       displayTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     
-    setLocal(KEYS.MESSAGES, [...messages, newMessage]);
-    return newMessage;
+    await fetch('/api/discussion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newMessage),
+    });
+    
+    const messages = await storageService.getDiscussionMessages();
+    return messages.find(m => m.id === id)!;
   },
 
   deleteDiscussionMessage: async (id: string) => {
-    const messages = getLocal<DiscussionMessage[]>(KEYS.MESSAGES, []);
-    setLocal(KEYS.MESSAGES, messages.filter(m => m.id !== id));
+    await fetch(`/api/discussion/${id}`, { method: 'DELETE' });
   },
 
   // --- LOGIQUE ADMIN ---
-  getNotifications: () => getLocal<Notification[]>(KEYS.NOTIFS, []),
-  addNotification: (n: Notification) => {
-    const current = getLocal<Notification[]>(KEYS.NOTIFS, []);
-    setLocal(KEYS.NOTIFS, [n, ...current]);
+  getNotifications: async () => {
+    const response = await fetch('/api/notifications');
+    if (!response.ok) return [];
+    return await response.json();
   },
-  getStrategicGoals: () => getLocal<any[]>(KEYS.GOALS, []),
-  addStrategicGoal: (text: string) => {
-    const current = getLocal<any[]>(KEYS.GOALS, []);
-    const updated = [...current, { id: Date.now().toString(), text, isCompleted: false }];
-    setLocal(KEYS.GOALS, updated);
-    return updated;
+  addNotification: async (n: Notification) => {
+    await fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(n),
+    });
   },
-  toggleStrategicGoal: (id: string) => {
-    const current = getLocal<any[]>(KEYS.GOALS, []);
-    const updated = current.map((g: any) => g.id === id ? { ...g, isCompleted: !g.isCompleted } : g);
-    setLocal(KEYS.GOALS, updated);
-    return updated;
+  getStrategicGoals: async () => {
+    const response = await fetch('/api/goals');
+    if (!response.ok) return [];
+    return await response.json();
   },
-  deleteStrategicGoal: (id: string) => {
-    const current = getLocal<any[]>(KEYS.GOALS, []);
-    const updated = current.filter((g: any) => g.id !== id);
-    setLocal(KEYS.GOALS, updated);
-    return updated;
+  addStrategicGoal: async (text: string) => {
+    const id = Date.now().toString();
+    await fetch('/api/goals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, text }),
+    });
+    return await storageService.getStrategicGoals();
   },
-  getVictories: () => getLocal<ClusterVictory[]>(KEYS.VICTORIES, []),
-  addVictory: (v: ClusterVictory) => {
-    const current = getLocal<ClusterVictory[]>(KEYS.VICTORIES, []);
-    const updated = [v, ...current];
-    setLocal(KEYS.VICTORIES, updated);
-    return updated;
+  toggleStrategicGoal: async (id: string, isCompleted: boolean) => {
+    await fetch(`/api/goals/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isCompleted }),
+    });
+    return await storageService.getStrategicGoals();
   },
-  updateVictory: (id: string, data: any) => {
-    const current = getLocal<ClusterVictory[]>(KEYS.VICTORIES, []);
-    const updated = current.map((v: any) => v.id === id ? { ...v, ...data } : v);
-    setLocal(KEYS.VICTORIES, updated);
-    return updated;
+  deleteStrategicGoal: async (id: string) => {
+    await fetch(`/api/goals/${id}`, { method: 'DELETE' });
+    return await storageService.getStrategicGoals();
   },
-  deleteVictory: (id: string) => {
-    const current = getLocal<ClusterVictory[]>(KEYS.VICTORIES, []);
-    const updated = current.filter((v: any) => v.id !== id);
-    setLocal(KEYS.VICTORIES, updated);
-    return updated;
+  getVictories: async () => {
+    const response = await fetch('/api/victories');
+    if (!response.ok) return [];
+    return await response.json();
+  },
+  addVictory: async (v: ClusterVictory) => {
+    await fetch('/api/victories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(v),
+    });
+    return await storageService.getVictories();
+  },
+  updateVictory: async (id: string, data: any) => {
+    await fetch(`/api/victories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return await storageService.getVictories();
+  },
+  deleteVictory: async (id: string) => {
+    await fetch(`/api/victories/${id}`, { method: 'DELETE' });
+    return await storageService.getVictories();
   }
 };

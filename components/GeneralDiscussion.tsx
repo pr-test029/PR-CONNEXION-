@@ -33,7 +33,7 @@ export const GeneralDiscussion: React.FC<{currentUser: Member | null}> = ({curre
       // Scroll to bottom
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }), 100);
     } catch (e) {
-      console.error("Erreur Neon:", e);
+      console.error("Erreur SQLite:", e);
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export const GeneralDiscussion: React.FC<{currentUser: Member | null}> = ({curre
       setMessages(prev => [...prev, added]);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (e) {
-      alert("Erreur base de données Neon.");
+      alert("Erreur base de données SQLite.");
     }
   };
 
@@ -96,7 +96,7 @@ export const GeneralDiscussion: React.FC<{currentUser: Member | null}> = ({curre
           <Lock className="w-12 h-12 text-blue-500" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">Accès Restreint</h2>
-        <p className="text-gray-500 dark:text-gray-400">Connectez-vous pour accéder au chat membre (Neon DB).</p>
+        <p className="text-gray-500 dark:text-gray-400">Connectez-vous pour accéder au chat membre (SQLite DB).</p>
       </div>
     );
   }
@@ -106,7 +106,7 @@ export const GeneralDiscussion: React.FC<{currentUser: Member | null}> = ({curre
       <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <MessageSquare className="w-5 h-5 text-primary-600" />
-          <h2 className="font-bold text-gray-900 dark:text-white">Discussion Générale (Neon)</h2>
+          <h2 className="font-bold text-gray-900 dark:text-white">Discussion Générale (SQLite)</h2>
         </div>
       </div>
 

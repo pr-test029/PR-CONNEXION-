@@ -7,7 +7,7 @@ export const Leaderboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
+    const loadLeaderboard = async () => {
       try {
         const data = await storageService.getLeaderboard();
         setLeaderboard(data);
@@ -17,7 +17,7 @@ export const Leaderboard: React.FC = () => {
         setLoading(false);
       }
     };
-    fetchLeaderboard();
+    loadLeaderboard();
   }, []);
 
   if (loading) {

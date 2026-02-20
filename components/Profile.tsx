@@ -75,7 +75,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
   const displayMemberId = viewedMemberId || currentUser?.id;
 
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       if (displayMemberId) {
         const members = await storageService.getAllMembers();
         const foundUser = members.find(m => m.id === displayMemberId);
@@ -84,7 +84,7 @@ export const Profile: React.FC<ProfileProps> = ({ setView, viewedMemberId, curre
       const trainings = await storageService.getTrainings();
       setAllTrainings(trainings);
     };
-    fetchData();
+    loadData();
   }, [displayMemberId]);
 
   const handleOpenEditProfile = () => {

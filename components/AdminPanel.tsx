@@ -28,8 +28,8 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
 
   useEffect(() => {
     if (currentUser?.role === 'ADMIN') {
-        setGoals(storageService.getStrategicGoals());
-        setVictories(storageService.getVictories());
+        storageService.getStrategicGoals().then(setGoals);
+        storageService.getVictories().then(setVictories);
         
         setLoadingPosts(true);
         storageService.getPosts()
@@ -55,7 +55,7 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
   }
 
   // --- NOTIFICATIONS HANDLERS ---
-  const handleSendNotification = (e: React.FormEvent) => {
+  const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !message) return;
 
@@ -67,7 +67,7 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
       authorName: currentUser?.name || 'Administration'
     };
 
-    storageService.addNotification(newNotif);
+    await storageService.addNotification(newNotif);
     setTitle('');
     setMessage('');
     setSuccessMsg('Notification envoyée à tous les membres avec succès !');
@@ -75,30 +75,30 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
   };
 
   // --- GOALS HANDLERS ---
-  const handleAddGoal = () => {
+  const handleAddGoal = async () => {
     if (!newGoalText.trim()) return;
-    const updatedGoals = storageService.addStrategicGoal(newGoalText);
+    const updatedGoals = await storageService.addStrategicGoal(newGoalText);
     setGoals(updatedGoals);
     setNewGoalText('');
   };
 
-  const handleToggleGoal = (id: string) => {
-    const updatedGoals = storageService.toggleStrategicGoal(id);
+  const handleToggleGoal = async (id: string, currentStatus: boolean) => {
+    const updatedGoals = await storageService.toggleStrategicGoal(id, !currentStatus);
     setGoals(updatedGoals);
   };
 
-  const handleDeleteGoal = (id: string) => {
-    const updatedGoals = storageService.deleteStrategicGoal(id);
+  const handleDeleteGoal = async (id: string) => {
+    const updatedGoals = await storageService.deleteStrategicGoal(id);
     setGoals(updatedGoals);
   };
 
   // --- VICTORIES HANDLERS ---
-  const handleSaveVictory = () => {
+  const handleSaveVictory = async () => {
     if (!newVictoryTitle.trim() || !newVictoryDesc.trim()) return;
 
     if (editingVictoryId) {
         // Update
-        const updatedList = storageService.updateVictory(editingVictoryId, {
+        const updatedList = await storageService.updateVictory(editingVictoryId, {
             title: newVictoryTitle,
             description: newVictoryDesc
         });
@@ -113,7 +113,7 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
             description: newVictoryDesc,
             date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
         };
-        const updatedList = storageService.addVictory(newVictory);
+        const updatedList = await storageService.addVictory(newVictory);
         setVictories(updatedList);
         setSuccessMsg('Victoire ajoutée avec succès !');
     }
@@ -135,9 +135,9 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
       setNewVictoryDesc('');
   };
 
-  const handleDeleteVictory = (id: string) => {
+  const handleDeleteVictory = async (id: string) => {
       if (window.confirm('Êtes-vous sûr de vouloir supprimer cette victoire ?')) {
-          const updatedList = storageService.deleteVictory(id);
+          const updatedList = await storageService.deleteVictory(id);
           setVictories(updatedList);
       }
   };
@@ -250,7 +250,7 @@ export const AdminPanel: React.FC<{currentUser: Member | null}> = ({currentUser}
               <div key={goal.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg group hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors">
                  <div className="flex items-center space-x-3 flex-1">
                     <button 
-                      onClick={() => handleToggleGoal(goal.id)}
+                      onClick={() => handleToggleGoal(goal.id, goal.isCompleted)}
                       className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                         goal.isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600'
                       }`}
